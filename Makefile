@@ -1,8 +1,12 @@
-.PHONY: build run test clean docker-up docker-down migrate help
+.PHONY: build run test clean docker-up docker-down migrate-all migrate-ingestion migrate-eventhandler help
 
 # Go parameters
 BINARY_NAME=platform
 MAIN_PATH=./cmd/platform
+
+# Database defaults (dev)
+INGESTION_DB_URL ?= postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable
+EVENTHANDLER_DB_URL ?= postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -32,21 +36,27 @@ docker-down: ## Stop infrastructure containers
 docker-logs: ## Show infrastructure logs
 	docker compose logs -f
 
-migrate: ## Run database migrations
-	@echo "Running migrations..."
-	@for f in migrations/*.sql; do \
+# Per-service migrations (ADR-0010)
+migrate-ingestion: ## Run ingestion service migrations
+	@echo "Running ingestion migrations..."
+	@for f in internal/ingestion/migrations/*.sql; do \
 		echo "Applying $$f..."; \
 		docker compose exec -T postgres psql -U cornjacket -d cornjacket -f /dev/stdin < $$f; \
 	done
-	@echo "Migrations complete."
+	@echo "Ingestion migrations complete."
 
-migrate-local: ## Run migrations using local psql
-	@echo "Running migrations..."
-	@for f in migrations/*.sql; do \
+migrate-eventhandler: ## Run event handler migrations
+	@echo "Running event handler migrations..."
+	@for f in internal/eventhandler/migrations/*.sql; do \
 		echo "Applying $$f..."; \
-		psql "postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable" -f $$f; \
+		docker compose exec -T postgres psql -U cornjacket -d cornjacket -f /dev/stdin < $$f; \
 	done
-	@echo "Migrations complete."
+	@echo "Event handler migrations complete."
+
+migrate-all: migrate-ingestion migrate-eventhandler ## Run all migrations
+
+# Aliases for convenience
+migrate: migrate-all ## Alias for migrate-all
 
 lint: ## Run linter
 	golangci-lint run
@@ -56,4 +66,4 @@ fmt: ## Format code
 	gofmt -s -w .
 
 # Development workflow
-dev: docker-up migrate run ## Full dev setup: start docker, migrate, run app
+dev: docker-up migrate-all run ## Full dev setup: start docker, migrate, run app

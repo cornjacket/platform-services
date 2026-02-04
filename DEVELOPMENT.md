@@ -23,6 +23,9 @@ platform-services/
 │   │   └── models/                  # Domain models
 │   │
 │   ├── ingestion/                   # Ingestion Service (:8080)
+│   │   ├── migrations/              # Service-owned migrations (ADR-0010)
+│   │   │   ├── 001_create_outbox.sql
+│   │   │   └── 002_create_event_store.sql
 │   │   ├── handler.go               # HTTP handlers
 │   │   ├── service.go               # Validation, business logic
 │   │   ├── repository.go            # Interface definitions
@@ -45,6 +48,9 @@ platform-services/
 │   │   └── README.md
 │   │
 │   ├── eventhandler/                # Event Handler (background worker)
+│   │   ├── migrations/              # Service-owned migrations (ADR-0010)
+│   │   │   ├── 001_create_projections.sql
+│   │   │   └── 002_create_dlq.sql
 │   │   ├── consumer.go              # Redpanda consumer
 │   │   ├── projector.go             # Projection update logic
 │   │   ├── repository.go
@@ -87,11 +93,6 @@ platform-services/
 │       ├── ingestion.yaml
 │       ├── query.yaml
 │       └── actions.yaml
-│
-├── migrations/                      # Database migrations
-│   ├── 001_create_outbox.sql
-│   ├── 002_create_event_store.sql
-│   └── ...
 │
 ├── deploy/                          # Deployment code
 │   └── terraform/                   # ECS task definition, etc.
@@ -205,30 +206,48 @@ internal/infra/postgres ───implements───► internal/ingestion.Outbo
 ### Prerequisites
 
 - Go 1.21+
-- Docker and docker-compose
+- Docker with Compose plugin (`docker compose`)
 - Make (optional, for convenience commands)
 
 ### Running Locally
 
 1. Start infrastructure:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
-2. Run the application:
+2. Run migrations:
+   ```bash
+   make migrate-all
+   ```
+
+3. Run the application:
    ```bash
    go run ./cmd/platform
    ```
 
-   Or with live reload (if using air):
+   Or use the dev shortcut (does all of the above):
    ```bash
-   air
+   make dev
    ```
 
-3. Access points:
+4. Access points:
    - Ingestion API: http://localhost:8080
    - Query API: http://localhost:8081
-   - Actions API: http://localhost:8082
+   - Actions API: http://localhost:8083
+
+### Starting Fresh
+
+To reset the database and start with a clean slate:
+
+```bash
+# Stop containers and remove volumes (destroys all data)
+docker compose down -v
+
+# Start fresh
+docker compose up -d
+make migrate-all
+```
 
 ### Testing the Ingestion Endpoint
 
@@ -267,12 +286,32 @@ go test -tags=component ./...
 
 Configuration is loaded from environment variables. See `internal/config/config.go` for all options.
 
+### Server Ports
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT_INGESTION` | 8080 | Ingestion service port |
 | `PORT_QUERY` | 8081 | Query service port |
-| `PORT_ACTIONS` | 8082 | Actions service port |
-| `DATABASE_URL` | - | PostgreSQL connection string |
+| `PORT_ACTIONS` | 8083 | Actions service port |
+
+### Per-Service Database URLs (ADR-0010)
+
+Each service receives its own database URL. In dev, all default to the same database.
+
+| Variable | Default | Service |
+|----------|---------|---------|
+| `INGESTION_DATABASE_URL` | localhost cornjacket | Ingestion + Outbox Processor |
+| `EVENTHANDLER_DATABASE_URL` | localhost cornjacket | Event Handler |
+| `QUERY_DATABASE_URL` | localhost cornjacket | Query Service |
+| `TSDB_DATABASE_URL` | localhost cornjacket | TSDB Writer |
+| `ACTIONS_DATABASE_URL` | localhost cornjacket | Action Orchestrator |
+
+Default: `postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable`
+
+### Other Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `REDPANDA_BROKERS` | localhost:9092 | Kafka broker addresses |
 | `ENABLE_TSDB` | false | Enable TSDB writer |
 

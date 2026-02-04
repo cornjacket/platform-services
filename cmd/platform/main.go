@@ -39,8 +39,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize PostgreSQL client
-	pgClient, err := postgres.NewClient(ctx, cfg.DatabaseURL, logger)
+	// Initialize PostgreSQL client for Ingestion service
+	pgClient, err := postgres.NewClient(ctx, cfg.DatabaseURLIngestion, logger)
 	if err != nil {
 		slog.Error("failed to connect to PostgreSQL", "error", err)
 		os.Exit(1)
