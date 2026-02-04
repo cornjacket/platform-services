@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cornjacket/platform-services/internal/config"
-	"github.com/cornjacket/platform-services/internal/infra/postgres"
-	"github.com/cornjacket/platform-services/internal/ingestion"
+	"github.com/cornjacket/platform-services/internal/shared/config"
+	"github.com/cornjacket/platform-services/internal/shared/infra/postgres"
+	"github.com/cornjacket/platform-services/internal/services/ingestion"
 )
 
 func main() {

@@ -39,7 +39,7 @@ docker-logs: ## Show infrastructure logs
 # Per-service migrations (ADR-0010)
 migrate-ingestion: ## Run ingestion service migrations
 	@echo "Running ingestion migrations..."
-	@for f in internal/ingestion/migrations/*.sql; do \
+	@for f in internal/services/ingestion/migrations/*.sql; do \
 		echo "Applying $$f..."; \
 		docker compose exec -T postgres psql -U cornjacket -d cornjacket -f /dev/stdin < $$f; \
 	done
@@ -47,7 +47,7 @@ migrate-ingestion: ## Run ingestion service migrations
 
 migrate-eventhandler: ## Run event handler migrations
 	@echo "Running event handler migrations..."
-	@for f in internal/eventhandler/migrations/*.sql; do \
+	@for f in internal/services/eventhandler/migrations/*.sql; do \
 		echo "Applying $$f..."; \
 		docker compose exec -T postgres psql -U cornjacket -d cornjacket -f /dev/stdin < $$f; \
 	done

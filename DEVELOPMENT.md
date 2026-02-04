@@ -10,92 +10,56 @@ platform-services/
 │   └── platform/                    # Single binary entry point
 │       └── main.go                  # Wires everything, starts servers + workers
 │
-├── internal/                        # Private application code
+├── internal/
+│   ├── shared/                      # Shared code (config, domain, infrastructure)
+│   │   ├── config/
+│   │   │   └── config.go            # Env vars, feature flags
+│   │   ├── domain/
+│   │   │   ├── events/              # Event types and envelope
+│   │   │   │   └── envelope.go
+│   │   │   └── models/              # Domain models
+│   │   └── infra/                   # Infrastructure adapters
+│   │       ├── postgres/
+│   │       │   ├── client.go        # Connection pool, health check
+│   │       │   └── outbox.go        # OutboxRepository implementation
+│   │       ├── redpanda/
+│   │       │   ├── producer.go      # Kafka producer wrapper
+│   │       │   └── consumer.go      # Kafka consumer wrapper
+│   │       └── http/
+│   │           └── webhook.go       # HTTP client for webhook delivery
 │   │
-│   ├── config/                      # Configuration loading
-│   │   └── config.go                # Env vars, feature flags (e.g., EnableTSDB)
-│   │
-│   ├── domain/                      # Core domain (no external dependencies)
-│   │   ├── events/                  # Event types and envelope
-│   │   │   ├── envelope.go          # Common event structure
-│   │   │   ├── sensor.go            # sensor.reading events
-│   │   │   └── user.go              # user.action events
-│   │   └── models/                  # Domain models
-│   │
-│   ├── ingestion/                   # Ingestion Service (:8080)
-│   │   ├── migrations/              # Service-owned migrations (ADR-0010)
-│   │   │   ├── 001_create_outbox.sql
-│   │   │   └── 002_create_event_store.sql
-│   │   ├── handler.go               # HTTP handlers
-│   │   ├── service.go               # Validation, business logic
-│   │   ├── repository.go            # Interface definitions
-│   │   ├── routes.go                # Route registration
-│   │   └── README.md                # Service documentation
-│   │
-│   ├── query/                       # Query Service (:8081)
-│   │   ├── handler.go
-│   │   ├── service.go
-│   │   ├── repository.go
-│   │   ├── routes.go
-│   │   └── README.md
-│   │
-│   ├── actions/                     # Action Orchestrator (:8082)
-│   │   ├── handler.go               # HTTP handlers (webhook config API)
-│   │   ├── consumer.go              # Redpanda consumer
-│   │   ├── executor.go              # Webhook execution, retry, circuit breaker
-│   │   ├── repository.go
-│   │   ├── routes.go
-│   │   └── README.md
-│   │
-│   ├── eventhandler/                # Event Handler (background worker)
-│   │   ├── migrations/              # Service-owned migrations (ADR-0010)
-│   │   │   ├── 001_create_projections.sql
-│   │   │   └── 002_create_dlq.sql
-│   │   ├── consumer.go              # Redpanda consumer
-│   │   ├── projector.go             # Projection update logic
-│   │   ├── repository.go
-│   │   └── README.md
-│   │
-│   ├── tsdb/                        # TSDB Writer (optional background worker)
-│   │   ├── consumer.go              # Redpanda consumer
-│   │   ├── transformer.go           # Event → time-series row
-│   │   ├── writer.go                # TimescaleDB write logic
-│   │   ├── repository.go
-│   │   └── README.md
-│   │
-│   ├── outbox/                      # Outbox Processor (background worker)
-│   │   ├── processor.go             # NOTIFY/LISTEN + processing loop
-│   │   ├── publisher.go             # Event store + Redpanda publish
-│   │   ├── repository.go
-│   │   └── README.md
-│   │
-│   └── infra/                       # Infrastructure adapters
-│       ├── postgres/
-│       │   ├── client.go            # Connection pool, health check
-│       │   ├── outbox.go            # OutboxRepository implementation
-│       │   ├── eventstore.go        # EventStoreRepository implementation
-│       │   ├── projections.go       # ProjectionRepository implementation
-│       │   ├── timeseries.go        # TimeSeriesRepository implementation
-│       │   └── dlq.go               # DLQRepository implementation
-│       ├── redpanda/
-│       │   ├── producer.go          # Kafka producer wrapper
-│       │   └── consumer.go          # Kafka consumer wrapper
-│       └── http/
-│           └── webhook.go           # HTTP client for webhook delivery
+│   └── services/                    # Individual services
+│       ├── ingestion/               # Ingestion Service (:8080)
+│       │   ├── migrations/          # Service-owned migrations (ADR-0010)
+│       │   │   ├── 001_create_outbox.sql
+│       │   │   └── 002_create_event_store.sql
+│       │   ├── handler.go           # HTTP handlers
+│       │   ├── service.go           # Business logic
+│       │   ├── repository.go        # Interface definitions
+│       │   └── routes.go
+│       │
+│       ├── query/                   # Query Service (:8081)
+│       │
+│       ├── actions/                 # Action Orchestrator (:8083)
+│       │
+│       ├── eventhandler/            # Event Handler (background worker)
+│       │   ├── migrations/
+│       │   │   ├── 001_create_projections.sql
+│       │   │   └── 002_create_dlq.sql
+│       │   └── ...
+│       │
+│       ├── outbox/                  # Outbox Processor (background worker)
+│       │
+│       └── tsdb/                    # TSDB Writer (optional)
 │
 ├── pkg/                             # Public libraries (importable by other repos)
 │   └── client/                      # Go client SDK for the platform
-│       ├── ingestion.go             # Ingestion client
-│       └── query.go                 # Query client
 │
 ├── api/                             # API definitions
 │   └── openapi/
-│       ├── ingestion.yaml
-│       ├── query.yaml
-│       └── actions.yaml
 │
 ├── deploy/                          # Deployment code
-│   └── terraform/                   # ECS task definition, etc.
+│   └── terraform/
 │
 ├── docker-compose.yml               # Local dev (infrastructure only)
 ├── Dockerfile                       # Production image
@@ -115,7 +79,7 @@ Services define interfaces for what they need. Infrastructure implements those i
 
 #### Example
 
-**internal/ingestion/repository.go** — Service defines what it needs:
+**internal/services/ingestion/repository.go** — Service defines what it needs:
 ```go
 package ingestion
 
@@ -128,7 +92,7 @@ type OutboxRepository interface {
 }
 ```
 
-**internal/ingestion/service.go** — Service uses the interface:
+**internal/services/ingestion/service.go** — Service uses the interface:
 ```go
 package ingestion
 
@@ -146,11 +110,11 @@ func (s *Service) Ingest(ctx context.Context, event Event) error {
 }
 ```
 
-**internal/infra/postgres/outbox.go** — Infrastructure implements the interface:
+**internal/shared/infra/postgres/outbox.go** — Infrastructure implements the interface:
 ```go
 package postgres
 
-import "github.com/cornjacket/platform-services/internal/ingestion"
+import "github.com/cornjacket/platform-services/internal/services/ingestion"
 
 // OutboxRepo implements ingestion.OutboxRepository
 type OutboxRepo struct {
@@ -178,16 +142,16 @@ ingestionService := ingestion.NewService(outboxRepo)
 cmd/platform (wiring)
       │
       ▼
-internal/infra/postgres ───implements───► internal/ingestion.OutboxRepository
-                                                      ▲
-                                                      │
-                                          internal/ingestion.Service uses
+internal/shared/infra/postgres ───implements───► internal/services/ingestion.OutboxRepository
+                                                              ▲
+                                                              │
+                                              internal/services/ingestion.Service uses
 ```
 
 **Key rules:**
-- `internal/domain` has NO external dependencies (pure Go types)
-- Services (`ingestion`, `query`, etc.) depend only on `domain` and their own interfaces
-- `internal/infra` imports services to implement their interfaces
+- `internal/shared/domain` has NO external dependencies (pure Go types)
+- Services (`internal/services/*`) depend only on `shared/domain` and their own interfaces
+- `internal/shared/infra` imports services to implement their interfaces
 - `cmd/platform` wires everything together
 - No circular dependencies
 
@@ -284,7 +248,7 @@ go test -tags=component ./...
 
 ## Configuration
 
-Configuration is loaded from environment variables. See `internal/config/config.go` for all options.
+Configuration is loaded from environment variables. See `internal/shared/config/config.go` for all options.
 
 ### Server Ports
 

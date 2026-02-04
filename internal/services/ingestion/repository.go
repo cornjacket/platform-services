@@ -3,7 +3,7 @@ package ingestion
 import (
 	"context"
 
-	"github.com/cornjacket/platform-services/internal/domain/events"
+	"github.com/cornjacket/platform-services/internal/shared/domain/events"
 )
 
 // OutboxRepository defines the interface for outbox operations.

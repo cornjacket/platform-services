@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/cornjacket/platform-services/internal/domain/events"
+	"github.com/cornjacket/platform-services/internal/shared/domain/events"
 )
 
 // Service handles event ingestion business logic.

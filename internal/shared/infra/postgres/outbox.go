@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/cornjacket/platform-services/internal/domain/events"
+	"github.com/cornjacket/platform-services/internal/shared/domain/events"
 )
 
 // OutboxRepo implements ingestion.OutboxRepository using PostgreSQL.
