@@ -1,0 +1,52 @@
+version: "2.4"
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.11.2-pg15
+    container_name: cornjacket-postgres
+    environment:
+      POSTGRES_USER: cornjacket
+      POSTGRES_PASSWORD: cornjacket
+      POSTGRES_DB: cornjacket
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redpanda:
+    image: redpandadata/redpanda:v23.2.19
+    container_name: cornjacket-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://localhost:9092
+      - --pandaproxy-addr=0.0.0.0:8082
+      - --advertise-pandaproxy-addr=localhost:8082
+    ports:
+      - "9092:9092"
+      - "8082:8082"
+      - "9644:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+
+  redpanda-console:
+    image: redpandadata/console:v2.3.1
+    container_name: cornjacket-redpanda-console
+    depends_on:
+      - redpanda
+    ports:
+      - "8084:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      REDPANDA_ADMINAPI_ENABLED: "true"
+      REDPANDA_ADMINAPI_URLS: http://redpanda:9644
+
+volumes:
+  postgres_data:
+  redpanda_data:

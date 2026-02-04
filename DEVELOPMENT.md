@@ -230,6 +230,26 @@ internal/infra/postgres ───implements───► internal/ingestion.Outbo
    - Query API: http://localhost:8081
    - Actions API: http://localhost:8082
 
+### Testing the Ingestion Endpoint
+
+```bash
+# Ingest an event
+curl -X POST http://localhost:8080/api/v1/events \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"sensor.reading","aggregate_id":"device-001","payload":{"temperature":72.5}}'
+
+# Expected response:
+# {"event_id":"<uuid>","status":"accepted"}
+
+# Verify the event is in the outbox
+docker compose exec postgres psql -U cornjacket -d cornjacket -c "SELECT * FROM outbox;"
+
+# Check health endpoint
+curl http://localhost:8080/health
+```
+
+**Note:** When using backslash line continuation in zsh/bash, ensure there are no trailing spaces after `\`.
+
 ### Running Tests
 
 ```bash
@@ -239,7 +259,7 @@ go test ./...
 # With coverage
 go test -cover ./...
 
-# Component tests (requires docker-compose up)
+# Component tests (requires docker compose up)
 go test -tags=component ./...
 ```
 
