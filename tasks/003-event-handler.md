@@ -1,6 +1,6 @@
 # Task 003: Event Handler
 
-**Status:** Draft
+**Status:** Ready
 **Created:** 2026-02-05
 **Updated:** 2026-02-05
 
@@ -221,7 +221,20 @@ See [ADR-0014](../../platform-docs/decisions/0014-event-handler-consumer-strateg
 
 **Decision:** Manual commit after successful projection update.
 
-This provides at-least-once delivery. If the consumer crashes after processing but before commit, the event will be reprocessed — handled by idempotency in projection updates.
+**What is "commit"?** In Kafka/Redpanda, committing tells the broker "I've processed up to this offset — don't send these messages again." The broker stores the committed offset per consumer group. On restart, the consumer resumes from the last committed offset.
+
+```
+Topic: sensor-events
+Partition 0: [msg0] [msg1] [msg2] [msg3] [msg4] ...
+                                    ▲
+                                    └── Committed offset = 3
+                                        "Consumer has processed 0, 1, 2"
+```
+
+**Why manual commit?** This provides at-least-once delivery:
+- Commit only after successful projection update
+- If crash occurs before commit → message reprocessed on restart
+- Idempotency in projection updates handles duplicates
 
 ## Notes
 
