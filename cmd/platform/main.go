@@ -40,15 +40,15 @@ func main() {
 	defer cancel()
 
 	// Initialize PostgreSQL client for Ingestion service
-	pgClient, err := postgres.NewClient(ctx, cfg.DatabaseURLIngestion, logger)
+	ingestionPG, err := postgres.NewClient(ctx, cfg.DatabaseURLIngestion, logger)
 	if err != nil {
 		slog.Error("failed to connect to PostgreSQL", "error", err)
 		os.Exit(1)
 	}
-	defer pgClient.Close()
+	defer ingestionPG.Close()
 
 	// Initialize repositories
-	outboxRepo := postgres.NewOutboxRepo(pgClient.Pool(), logger)
+	outboxRepo := postgres.NewOutboxRepo(ingestionPG.Pool(), logger)
 
 	// Initialize ingestion service
 	ingestionService := ingestion.NewService(outboxRepo, logger)
