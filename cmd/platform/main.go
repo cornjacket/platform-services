@@ -7,12 +7,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
+	"github.com/cornjacket/platform-services/internal/services/ingestion"
+	"github.com/cornjacket/platform-services/internal/services/outbox"
 	"github.com/cornjacket/platform-services/internal/shared/config"
 	"github.com/cornjacket/platform-services/internal/shared/infra/postgres"
-	"github.com/cornjacket/platform-services/internal/services/ingestion"
+	"github.com/cornjacket/platform-services/internal/shared/infra/redpanda"
 )
 
 func main() {
@@ -75,9 +80,52 @@ func main() {
 		}
 	}()
 
+	// Initialize Outbox Processor
+	// Create dedicated LISTEN connection (not from pool)
+	listenConn, err := pgx.Connect(ctx, cfg.DatabaseURLIngestion)
+	if err != nil {
+		slog.Error("failed to create LISTEN connection", "error", err)
+		os.Exit(1)
+	}
+	defer listenConn.Close(context.Background())
+
+	// Create event store repository
+	eventStoreRepo := postgres.NewEventStoreRepo(ingestionPG.Pool(), logger)
+
+	// Create Redpanda producer
+	brokers := strings.Split(cfg.RedpandaBrokers, ",")
+	redpandaProducer, err := redpanda.NewProducer(brokers, logger)
+	if err != nil {
+		slog.Error("failed to create Redpanda producer", "error", err)
+		os.Exit(1)
+	}
+	defer redpandaProducer.Close()
+
+	// Create outbox processor
+	outboxProcessor := outbox.NewProcessor(
+		postgres.NewOutboxReaderAdapter(ingestionPG.Pool(), logger),
+		eventStoreRepo,
+		redpandaProducer,
+		listenConn,
+		outbox.ProcessorConfig{
+			WorkerCount:  cfg.OutboxWorkerCount,
+			BatchSize:    cfg.OutboxBatchSize,
+			MaxRetries:   cfg.OutboxMaxRetries,
+			PollInterval: cfg.OutboxPollInterval,
+		},
+		logger,
+	)
+
+	// Start outbox processor in goroutine
+	go func() {
+		if err := outboxProcessor.Start(ctx); err != nil {
+			slog.Error("outbox processor error", "error", err)
+			cancel()
+		}
+	}()
+
 	// TODO: Initialize and start Query service
 	// TODO: Initialize and start Actions service
-	// TODO: Start Outbox processor (NOTIFY/LISTEN)
 	// TODO: Start Event handler consumer
 
 	// Wait for shutdown signal

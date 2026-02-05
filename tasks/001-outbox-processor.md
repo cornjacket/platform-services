@@ -1,8 +1,8 @@
 # Task 001: Outbox Processor
 
-**Status:** Draft
+**Status:** Complete
 **Created:** 2026-02-04
-**Updated:** 2026-02-04
+**Updated:** 2026-02-05
 
 ## Context
 
@@ -236,26 +236,61 @@ func (p *Processor) processOutbox(ctx context.Context) error {
 
 ## Acceptance Criteria
 
-- [ ] Processor starts and listens for NOTIFY events
-- [ ] New outbox entries are processed within seconds
-- [ ] Events appear in event_store table after processing
-- [ ] Events are published to Redpanda topic
-- [ ] Processed entries are deleted from outbox
-- [ ] Failed entries have retry_count incremented
-- [ ] Graceful shutdown waits for in-flight processing
+- [x] Processor starts and listens for NOTIFY events
+- [x] New outbox entries are processed within seconds
+- [x] Events appear in event_store table after processing
+- [x] Events are published to Redpanda topic
+- [x] Processed entries are deleted from outbox
+- [x] Failed entries have retry_count incremented
+- [x] Graceful shutdown waits for in-flight processing
 
-## Open Questions
+## Design Decisions
 
-1. **Transaction boundary:** Should event store write + outbox delete be in one transaction?
-   - Pro: Atomicity
-   - Con: Couples two operations, Redpanda publish is outside transaction anyway
+### Transaction Boundary
 
-2. **Idempotency:** How to handle duplicate processing if delete fails?
-   - Option A: Event store has unique constraint on event_id
-   - Option B: Check before insert
+**Decision:** Separate operations (no single transaction).
 
-3. **Redpanda topic selection:** One topic or per-event-type topics?
-   - Design spec says per-event-type: `sensor-events`, `user-actions`, `system-events`
+The processing steps run independently:
+1. Write to event store
+2. Publish to Redpanda
+3. Delete from outbox
+
+If delete fails after event store write, the entry gets reprocessed — handled by idempotency.
+
+**Future consideration:** If we observe data inconsistencies in production, revisit wrapping event store write + delete in a transaction. Documented in ARCHITECTURE.md as a potential issue.
+
+### Idempotency
+
+**Decision:** Unique constraint on `event_store.event_id` (PRIMARY KEY).
+
+On duplicate processing:
+1. Event store INSERT fails with unique violation
+2. Catch error, log as debug (not error — expected during retry)
+3. Proceed to delete from outbox
+
+### Topic Selection
+
+**Decision:** Derive topic from `event_type` prefix.
+
+| event_type | Topic |
+|------------|-------|
+| `sensor.*` | `sensor-events` |
+| `user.*` | `user-actions` |
+| `system.*` | `system-events` |
+| (default) | `system-events` |
+
+```go
+func topicFromEventType(eventType string) string {
+    switch {
+    case strings.HasPrefix(eventType, "sensor."):
+        return "sensor-events"
+    case strings.HasPrefix(eventType, "user."):
+        return "user-actions"
+    default:
+        return "system-events"
+    }
+}
+```
 
 ## Notes
 

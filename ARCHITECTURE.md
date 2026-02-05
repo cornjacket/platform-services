@@ -204,6 +204,14 @@ When outbox entries exhaust retries, no alert is triggered. These failures will 
 
 See [Task 001](tasks/001-outbox-processor.md) for rationale on why DLQ was omitted.
 
+### 6. Non-Atomic Outbox Processing (Low Severity)
+
+Event store write and outbox delete are separate operations, not in a single transaction. If delete fails after successful write, the entry will be reprocessed.
+
+**Why it's OK for now:** Idempotency via unique constraint on `event_id` handles duplicates gracefully. Reprocessing is harmless.
+
+**Action:** Monitor for data inconsistencies in production. If observed, consider wrapping event store write + outbox delete in a transaction (Redpanda publish would remain outside).
+
 ## Adding a New Service
 
 1. Create folder: `internal/services/<name>/`

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Default database URL for local development (all services share one DB)
@@ -25,6 +26,12 @@ type Config struct {
 
 	// Redpanda
 	RedpandaBrokers string
+
+	// Outbox processor
+	OutboxWorkerCount  int
+	OutboxBatchSize    int
+	OutboxMaxRetries   int
+	OutboxPollInterval time.Duration
 
 	// Feature flags
 	EnableTSDB bool
@@ -49,6 +56,12 @@ func Load() (*Config, error) {
 
 		// Redpanda
 		RedpandaBrokers: getEnv("REDPANDA_BROKERS", "localhost:9092"),
+
+		// Outbox processor
+		OutboxWorkerCount:  getEnvInt("OUTBOX_WORKER_COUNT", 4),
+		OutboxBatchSize:    getEnvInt("OUTBOX_BATCH_SIZE", 100),
+		OutboxMaxRetries:   getEnvInt("OUTBOX_MAX_RETRIES", 5),
+		OutboxPollInterval: getEnvDuration("OUTBOX_POLL_INTERVAL", 5*time.Second),
 
 		// Feature flags
 		EnableTSDB: getEnvBool("ENABLE_TSDB", false),
@@ -91,6 +104,15 @@ func getEnvBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		if b, err := strconv.ParseBool(value); err == nil {
 			return b
+		}
+	}
+	return defaultValue
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if d, err := time.ParseDuration(value); err == nil {
+			return d
 		}
 	}
 	return defaultValue

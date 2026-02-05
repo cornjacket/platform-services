@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cornjacket/platform-services/internal/shared/domain/events"
+	outboxpkg "github.com/cornjacket/platform-services/internal/services/outbox"
 )
 
 // OutboxRepo implements ingestion.OutboxRepository using PostgreSQL.
@@ -125,4 +126,45 @@ func (r *OutboxRepo) IncrementRetry(ctx context.Context, outboxID string) error 
 	}
 
 	return nil
+}
+
+// OutboxReaderAdapter adapts OutboxRepo to the outbox.OutboxReader interface.
+type OutboxReaderAdapter struct {
+	repo *OutboxRepo
+}
+
+// NewOutboxReaderAdapter creates a new OutboxReaderAdapter.
+func NewOutboxReaderAdapter(pool *pgxpool.Pool, logger *slog.Logger) *OutboxReaderAdapter {
+	return &OutboxReaderAdapter{
+		repo: NewOutboxRepo(pool, logger),
+	}
+}
+
+// FetchPending implements outbox.OutboxReader.
+func (a *OutboxReaderAdapter) FetchPending(ctx context.Context, limit int) ([]outboxpkg.OutboxEntry, error) {
+	entries, err := a.repo.FetchPending(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to outbox package type
+	result := make([]outboxpkg.OutboxEntry, len(entries))
+	for i, e := range entries {
+		result[i] = outboxpkg.OutboxEntry{
+			OutboxID:   e.OutboxID,
+			Payload:    e.Payload,
+			RetryCount: e.RetryCount,
+		}
+	}
+	return result, nil
+}
+
+// Delete implements outbox.OutboxReader.
+func (a *OutboxReaderAdapter) Delete(ctx context.Context, outboxID string) error {
+	return a.repo.Delete(ctx, outboxID)
+}
+
+// IncrementRetry implements outbox.OutboxReader.
+func (a *OutboxReaderAdapter) IncrementRetry(ctx context.Context, outboxID string) error {
+	return a.repo.IncrementRetry(ctx, outboxID)
 }
