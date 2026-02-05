@@ -1,0 +1,202 @@
+# Platform Services - Architecture
+
+**Last Audited:** 2026-02-04
+
+This document describes how the codebase aligns with Clean Architecture / Hexagonal (Ports and Adapters) principles.
+
+## Folder Structure
+
+```
+platform-services/
+├── cmd/
+│   └── platform/
+│       └── main.go                    # Composition Root (wiring)
+│
+├── internal/
+│   ├── shared/
+│   │   ├── config/
+│   │   │   └── config.go              # Configuration loading
+│   │   ├── domain/
+│   │   │   ├── events/
+│   │   │   │   └── envelope.go        # Domain model
+│   │   │   └── models/                # Domain models (future)
+│   │   └── infra/
+│   │       ├── http/                  # HTTP client adapters (future)
+│   │       ├── postgres/
+│   │       │   ├── client.go          # DB connection adapter
+│   │       │   └── outbox.go          # OutboxRepository implementation
+│   │       └── redpanda/              # Kafka producer/consumer (future)
+│   │
+│   └── services/
+│       ├── ingestion/
+│       │   ├── handler.go             # HTTP handler (driving adapter)
+│       │   ├── service.go             # Application/Use Case logic
+│       │   ├── repository.go          # Port definition (interface)
+│       │   ├── routes.go              # Route registration
+│       │   └── migrations/            # Service-owned migrations
+│       │
+│       ├── eventhandler/              # Event Handler service (future)
+│       ├── actions/                   # Action Orchestrator (future)
+│       ├── outbox/                    # Outbox Processor (future)
+│       ├── query/                     # Query Service (future)
+│       └── tsdb/                      # TSDB Writer (future)
+│
+├── api/openapi/                       # API definitions (future)
+├── deploy/terraform/                  # Deployment code (future)
+└── pkg/client/                        # Public Go SDK (future)
+```
+
+## Layer Mapping
+
+| Clean Architecture Layer | Location | Example |
+|--------------------------|----------|---------|
+| **Entities (Domain)** | `internal/shared/domain/` | `events/envelope.go` |
+| **Use Cases (Application)** | `internal/services/*/service.go` | `ingestion/service.go` |
+| **Ports (Interfaces)** | `internal/services/*/repository.go` | `ingestion/repository.go` |
+| **Driving Adapters** | `internal/services/*/handler.go` | `ingestion/handler.go` |
+| **Driven Adapters** | `internal/shared/infra/` | `postgres/outbox.go` |
+| **Composition Root** | `cmd/platform/main.go` | Wiring |
+
+## Dependency Rules
+
+### The Golden Rule
+
+**Dependencies point inward.** Outer layers depend on inner layers, never the reverse.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  cmd/platform/main.go (Composition Root)                    │
+│    ┌─────────────────────────────────────────────────────┐  │
+│    │  internal/shared/infra/* (Driven Adapters)          │  │
+│    │    ┌─────────────────────────────────────────────┐  │  │
+│    │    │  internal/services/*/handler.go (Driving)   │  │  │
+│    │    │    ┌─────────────────────────────────────┐  │  │  │
+│    │    │    │  internal/services/*/service.go     │  │  │  │
+│    │    │    │    ┌─────────────────────────────┐  │  │  │  │
+│    │    │    │    │  internal/shared/domain/*   │  │  │  │  │
+│    │    │    │    │  (Entities - NO DEPS)       │  │  │  │  │
+│    │    │    │    └─────────────────────────────┘  │  │  │  │
+│    │    │    └─────────────────────────────────────┘  │  │  │
+│    │    └─────────────────────────────────────────────┘  │  │
+│    └─────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Import Rules
+
+| Package | May Import | Must NOT Import |
+|---------|------------|-----------------|
+| `domain/*` | stdlib only | anything in `internal/` |
+| `services/*/service.go` | `domain/*` | `infra/*`, other services |
+| `services/*/handler.go` | same service only | `infra/*`, `domain/*` directly |
+| `services/*/repository.go` | `domain/*` | `infra/*` |
+| `infra/*` | `domain/*` | `services/*` |
+| `cmd/platform` | everything | — |
+
+### Current Import Verification
+
+```
+domain/events/envelope.go
+    └── imports: stdlib + github.com/google/uuid    ✅
+
+services/ingestion/service.go
+    └── imports: domain/events                       ✅
+
+services/ingestion/repository.go
+    └── imports: domain/events                       ✅
+
+services/ingestion/handler.go
+    └── imports: (nothing external)                  ✅
+
+infra/postgres/outbox.go
+    └── imports: domain/events                       ✅
+```
+
+## Ports and Adapters
+
+### Ports (Interfaces Owned by Services)
+
+Services define the interfaces they need. Infrastructure implements them.
+
+**Example:** `internal/services/ingestion/repository.go`
+```go
+type OutboxRepository interface {
+    Insert(ctx context.Context, event *events.Envelope) error
+}
+```
+
+### Driven Adapters (Infrastructure Implements Ports)
+
+**Example:** `internal/shared/infra/postgres/outbox.go`
+```go
+// OutboxRepo implements ingestion.OutboxRepository
+type OutboxRepo struct { ... }
+
+func (r *OutboxRepo) Insert(ctx context.Context, event *events.Envelope) error { ... }
+```
+
+### Driving Adapters (External → Application)
+
+HTTP handlers translate HTTP requests into service calls.
+
+**Example:** `internal/services/ingestion/handler.go`
+```go
+func (h *Handler) HandleIngest(w http.ResponseWriter, r *http.Request) {
+    var req IngestRequest
+    json.NewDecoder(r.Body).Decode(&req)  // translate
+    resp, err := h.service.Ingest(ctx, &req)  // delegate
+    h.writeJSON(w, http.StatusAccepted, resp)  // translate
+}
+```
+
+## Entity Purity
+
+Domain entities must be free of infrastructure coupling:
+
+| Check | Status |
+|-------|--------|
+| No ORM decorators (`gorm:`, `db:`) | ✅ |
+| No HTTP framework bindings | ✅ |
+| No infrastructure imports | ✅ |
+| Only stdlib + domain deps | ✅ |
+
+## Known Architectural Smells
+
+### 1. DTOs in Service Layer (Low Severity)
+
+`IngestRequest` and `IngestResponse` in `service.go` have `json` tags. Strictly, transport-specific DTOs belong in the handler layer.
+
+**Why it's OK for now:** Pragmatic trade-off for a small codebase. The service is still testable.
+
+### 2. Handler Depends on Concrete Service (Low Severity)
+
+```go
+type Handler struct {
+    service *Service  // concrete, not interface
+}
+```
+
+**Why it's OK for now:** Go idiom for internal code. Can add interface if testing requires it.
+
+### 3. OutboxEntry Defined in Infrastructure (Medium Severity)
+
+`OutboxEntry` in `postgres/outbox.go` will be needed by the Outbox Processor service. May need to move to domain or become a port type.
+
+**Action:** Address when implementing Outbox Processor.
+
+## Adding a New Service
+
+1. Create folder: `internal/services/<name>/`
+2. Define ports: `repository.go` (interfaces the service needs)
+3. Implement use cases: `service.go`
+4. Add driving adapter: `handler.go` (if HTTP-exposed)
+5. Add routes: `routes.go`
+6. Create migrations: `migrations/*.sql`
+7. Implement driven adapters in `internal/shared/infra/`
+8. Wire in `cmd/platform/main.go`
+
+## References
+
+- [DEVELOPMENT.md](DEVELOPMENT.md) — Build patterns and conventions
+- [ADR-0010](../platform-docs/decisions/0010-database-per-service-pattern.md) — Database-per-service pattern
+- [Design Spec](../platform-docs/design-spec.md) — Operational parameters
