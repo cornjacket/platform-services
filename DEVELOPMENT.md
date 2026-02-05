@@ -308,3 +308,5 @@ Default: `postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=dis
 - [Project Plan](../platform-docs/PROJECT.md) — Current phase and milestones
 - [ADRs](../platform-docs/decisions/) — Architectural decisions
 - [Design Spec](../platform-docs/design-spec.md) — Operational parameters
+- [Architecture](ARCHITECTURE.md) — Clean Architecture alignment
+- [Task Documents](tasks/) — Feature implementation specs

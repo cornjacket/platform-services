@@ -1,6 +1,6 @@
 # Platform Services - Architecture
 
-**Last Audited:** 2026-02-04
+**Last Audited:** 2026-02-05
 
 This document describes how the codebase aligns with Clean Architecture / Hexagonal (Ports and Adapters) principles.
 
@@ -97,7 +97,7 @@ platform-services/
 
 ```
 domain/events/envelope.go
-    └── imports: stdlib + github.com/google/uuid    ✅
+    └── imports: stdlib + github.com/gofrs/uuid/v5   ✅
 
 services/ingestion/service.go
     └── imports: domain/events                       ✅
@@ -183,6 +183,26 @@ type Handler struct {
 `OutboxEntry` in `postgres/outbox.go` will be needed by the Outbox Processor service. May need to move to domain or become a port type.
 
 **Action:** Address when implementing Outbox Processor.
+
+### 4. Single-Instance Outbox Processor (Medium Severity)
+
+The Outbox Processor uses a dispatcher + worker pool pattern that does not support horizontal scaling across multiple instances. Running multiple instances would cause duplicate processing.
+
+**Why it's OK for now:** Dev environment runs single instance. Throughput target is ~10 events/sec.
+
+**Action:** See [ADR-0012](../platform-docs/decisions/0012-outbox-processing-strategy.md) for future scaling paths (row locking or SQS migration).
+
+### 5. No Alerting for Retry Exhaustion (High Severity)
+
+When outbox entries exhaust retries, no alert is triggered. These failures will go unnoticed until manual inspection.
+
+**Why it's OK for now:** Dev environment with test data. Failures are visible in logs.
+
+**Action:** Before production, implement:
+- Alert on retry exhaustion
+- Alarm on outbox table growth (entries not draining)
+
+See [Task 001](tasks/001-outbox-processor.md) for rationale on why DLQ was omitted.
 
 ## Adding a New Service
 

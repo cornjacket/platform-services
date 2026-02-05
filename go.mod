@@ -3,7 +3,7 @@ module github.com/cornjacket/platform-services
 go 1.25.5
 
 require (
-	github.com/google/uuid v1.6.0
+	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/jackc/pgx/v5 v5.8.0
 )
 

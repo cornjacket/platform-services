@@ -1,8 +1,10 @@
 -- Dead Letter Queue table - stores failed events for debugging and replay
 -- Per-consumer DLQ in Postgres (not Redpanda topic)
 
+-- Note: Using native uuidv7() from PostgreSQL 18 (no extension needed)
+
 CREATE TABLE IF NOT EXISTS dlq (
-    dlq_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    dlq_id UUID PRIMARY KEY DEFAULT uuidv7(),
     consumer VARCHAR(255) NOT NULL,
     event_id UUID NOT NULL,
     event_payload JSONB NOT NULL,

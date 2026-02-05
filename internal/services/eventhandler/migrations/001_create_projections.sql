@@ -1,10 +1,12 @@
 -- Projections table - materialized views for queries (CQRS read side)
 -- Updated by the Event Handler when it consumes events from Redpanda
 
+-- Note: Using native uuidv7() from PostgreSQL 18 (no extension needed)
+
 -- Example projection: aggregate state
 -- This is a generic key-value projection; specific projections can be added later
 CREATE TABLE IF NOT EXISTS projections (
-    projection_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    projection_id UUID PRIMARY KEY DEFAULT uuidv7(),
     projection_type VARCHAR(255) NOT NULL,
     aggregate_id VARCHAR(255) NOT NULL,
     state JSONB NOT NULL,

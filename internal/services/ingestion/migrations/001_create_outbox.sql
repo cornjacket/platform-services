@@ -2,10 +2,10 @@
 -- Events are written here first, then processed by the background processor
 -- which writes to event_store + publishes to Redpanda, then deletes from outbox
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Note: Using native uuidv7() from PostgreSQL 18 (no extension needed)
 
 CREATE TABLE IF NOT EXISTS outbox (
-    outbox_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    outbox_id UUID PRIMARY KEY DEFAULT uuidv7(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     event_payload JSONB NOT NULL,
     retry_count INTEGER NOT NULL DEFAULT 0

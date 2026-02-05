@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 // Envelope is the common structure for all events in the system.
@@ -49,7 +49,7 @@ func NewEnvelope(eventType, aggregateID string, payload any, metadata Metadata) 
 	}
 
 	return &Envelope{
-		EventID:     uuid.New(),
+		EventID:     uuid.Must(uuid.NewV7()),
 		EventType:   eventType,
 		AggregateID: aggregateID,
 		Timestamp:   time.Now().UTC(),

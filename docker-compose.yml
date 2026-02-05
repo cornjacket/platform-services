@@ -2,7 +2,7 @@ version: "2.4"
 
 services:
   postgres:
-    image: timescale/timescaledb:2.11.2-pg15
+    image: timescale/timescaledb:2.23.0-pg18
     container_name: cornjacket-postgres
     environment:
       POSTGRES_USER: cornjacket
