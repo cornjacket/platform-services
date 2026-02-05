@@ -212,6 +212,14 @@ Event store write and outbox delete are separate operations, not in a single tra
 
 **Action:** Monitor for data inconsistencies in production. If observed, consider wrapping event store write + outbox delete in a transaction (Redpanda publish would remain outside).
 
+### 7. Single-Consumer Event Handler (Medium Severity)
+
+The Event Handler uses a single consumer subscribing to all topics. This does not support horizontal scaling — running multiple instances would cause duplicate processing within the same consumer group.
+
+**Why it's OK for now:** Dev environment targets ~10 events/sec. Single consumer handles this trivially.
+
+**Action:** See [ADR-0014](../platform-docs/decisions/0014-event-handler-consumer-strategy.md) for the migration path to topic-specific consumers with partition-based parallelism.
+
 ## Adding a New Service
 
 1. Create folder: `internal/services/<name>/`

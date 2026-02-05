@@ -18,6 +18,7 @@ The Outbox Processor publishes events to Redpanda topics. The Event Handler cons
 
 See:
 - [ADR-0003 CQRS with Eventual Consistency](../../platform-docs/decisions/0003-cqrs-with-eventual-consistency.md)
+- [ADR-0014 Event Handler Consumer Strategy](../../platform-docs/decisions/0014-event-handler-consumer-strategy.md)
 - [Design Spec — Event Types](../../platform-docs/design-spec.md#4-event-types)
 
 ## Functionality
@@ -208,13 +209,19 @@ groupID := "event-handler"
 - [ ] Graceful shutdown completes in-flight processing
 - [ ] Unknown event types are logged and skipped (not errors)
 
-## Open Questions
+## Design Decisions
 
-1. **Consumer parallelism:** Single consumer or multiple workers?
-   - **Proposal:** Single consumer for Phase 1. Partition-based parallelism in Phase 2 if needed.
+### Consumer Strategy
 
-2. **Offset commit strategy:** Auto-commit or manual commit after processing?
-   - **Proposal:** Manual commit after successful projection update for at-least-once delivery.
+**Decision:** Single consumer subscribing to all topics (Phase 1).
+
+See [ADR-0014](../../platform-docs/decisions/0014-event-handler-consumer-strategy.md) for rationale and future migration to topic-specific consumers with partition-based parallelism.
+
+### Offset Commit Strategy
+
+**Decision:** Manual commit after successful projection update.
+
+This provides at-least-once delivery. If the consumer crashes after processing but before commit, the event will be reprocessed — handled by idempotency in projection updates.
 
 ## Notes
 
