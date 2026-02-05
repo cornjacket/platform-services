@@ -149,6 +149,76 @@ func (h *Handler) HandleIngest(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+## Data Flow
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              WRITE PATH                                      │
+│                                                                              │
+│   HTTP ──▶ Ingestion ──▶ Outbox ──▶ Outbox Processor ──┬──▶ Event Store     │
+│   (MQTT)     Service      Table                        │                     │
+│                                                        └──▶ Redpanda        │
+│                                                              │               │
+└──────────────────────────────────────────────────────────────┼───────────────┘
+                                                               │
+┌──────────────────────────────────────────────────────────────┼───────────────┐
+│                              READ PATH                       ▼               │
+│                                                                              │
+│   Query ◀── Projections ◀── Event Handler ◀── Redpanda                      │
+│   Service      Table                            (consumer)                   │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Write Path
+
+1. **Entry:** HTTP request (or MQTT in Phase 2) arrives at Ingestion Service
+2. **Validate:** Ingestion Service validates the event envelope
+3. **Persist:** Event written to `outbox` table (durable, transactional)
+4. **Process:** Outbox Processor picks up entry (NOTIFY/LISTEN + watchdog)
+5. **Fan-out:**
+   - Write to `event_store` table (append-only log)
+   - Publish to Redpanda topic (based on event_type prefix)
+6. **Complete:** Delete from `outbox` table
+
+### Topic Routing
+
+The Outbox Processor routes events to topics based on `event_type` prefix:
+
+```
+event_type              →  topic
+─────────────────────────────────────
+sensor.reading          →  sensor-events
+sensor.offline          →  sensor-events
+user.login              →  user-actions
+user.logout             →  user-actions
+system.alert            →  system-events
+anything.else           →  system-events (default)
+```
+
+### Read Path
+
+1. **Consume:** Event Handler subscribes to Redpanda topics
+2. **Dispatch:** Route event to handler based on event_type
+3. **Project:** Update projection in `projections` table
+4. **Commit:** Commit consumer offset (at-least-once delivery)
+
+### Query Path
+
+1. **Request:** Query Service receives HTTP request
+2. **Read:** Fetch from `projections` table (pre-computed state)
+3. **Return:** Return projection data to client
+
+### Database Ownership (ADR-0010)
+
+| Component | Tables Owned | Database URL |
+|-----------|--------------|--------------|
+| Ingestion + Outbox Processor | `outbox`, `event_store` | `INGESTION_DATABASE_URL` |
+| Event Handler | `projections`, `dlq` | `EVENTHANDLER_DATABASE_URL` |
+| Query Service | (reads `projections`) | `QUERY_DATABASE_URL` |
+
 ## Event Types
 
 Events flow through the system via the Outbox Processor → Redpanda → Event Handler pipeline. The `event_type` field determines topic routing and projection handling.
