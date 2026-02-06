@@ -1,0 +1,148 @@
+openapi: 3.0.3
+info:
+  title: Cornjacket Ingestion Service API
+  description: Event ingestion endpoint for the Cornjacket Platform
+  version: 1.0.0
+  contact:
+    name: Cornjacket Platform Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /api/v1/events:
+    post:
+      summary: Ingest an event
+      description: |
+        Accepts an event and writes it to the outbox for processing.
+        Events are processed asynchronously and will eventually appear
+        in projections and the event store.
+      operationId: ingestEvent
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+            examples:
+              sensor_reading:
+                summary: Sensor reading event
+                value:
+                  event_type: sensor.reading
+                  aggregate_id: device-001
+                  payload:
+                    value: 72.5
+                    unit: fahrenheit
+              user_login:
+                summary: User login event
+                value:
+                  event_type: user.login
+                  aggregate_id: user-123
+                  payload:
+                    user_id: user-123
+                    ip: 192.168.1.1
+      responses:
+        '202':
+          description: Event accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+              example:
+                event_id: 01234567-89ab-cdef-0123-456789abcdef
+                status: accepted
+        '400':
+          description: Invalid request (validation error or malformed JSON)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "validation failed: event_type is required"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health status
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+
+components:
+  schemas:
+    IngestRequest:
+      type: object
+      required:
+        - event_type
+        - aggregate_id
+        - payload
+      properties:
+        event_type:
+          type: string
+          description: |
+            Event type identifier. Uses dot notation for categorization.
+            Prefix determines topic routing (sensor.* -> sensor-events, etc.)
+          example: sensor.reading
+        aggregate_id:
+          type: string
+          description: Identifier for the aggregate (entity) this event relates to
+          example: device-001
+        payload:
+          type: object
+          description: Event-specific data (must be valid JSON)
+          additionalProperties: true
+        trace_id:
+          type: string
+          description: Optional trace ID for distributed tracing
+          example: abc123
+
+    IngestResponse:
+      type: object
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: UUID v7 assigned to the event
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        status:
+          type: string
+          description: Processing status
+          enum:
+            - accepted
+          example: accepted
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - unhealthy
+          example: healthy
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: validation failed

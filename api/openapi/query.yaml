@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: Cornjacket Query Service API
+  description: Read API for querying projections in the Cornjacket Platform
+  version: 1.0.0
+  contact:
+    name: Cornjacket Platform Team
+
+servers:
+  - url: http://localhost:8081
+    description: Local development
+
+paths:
+  /api/v1/projections/{projection_type}/{aggregate_id}:
+    get:
+      summary: Get a projection
+      description: |
+        Retrieves a projection by type and aggregate ID.
+        Projections are pre-computed materialized views updated by the Event Handler.
+      operationId: getProjection
+      tags:
+        - Projections
+      parameters:
+        - name: projection_type
+          in: path
+          required: true
+          description: |
+            Type of projection to retrieve.
+            Available types: sensor_state, user_session
+          schema:
+            type: string
+            enum:
+              - sensor_state
+              - user_session
+          example: sensor_state
+        - name: aggregate_id
+          in: path
+          required: true
+          description: Aggregate ID (entity identifier)
+          schema:
+            type: string
+          example: device-001
+      responses:
+        '200':
+          description: Projection found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Projection'
+              examples:
+                sensor_state:
+                  summary: Sensor state projection
+                  value:
+                    projection_id: 01234567-89ab-cdef-0123-456789abcdef
+                    projection_type: sensor_state
+                    aggregate_id: device-001
+                    state:
+                      value: 72.5
+                      unit: fahrenheit
+                    last_event_id: 01234567-89ab-cdef-0123-456789abcdef
+                    last_event_timestamp: "2026-02-06T10:30:00Z"
+                    updated_at: "2026-02-06T10:30:00Z"
+                user_session:
+                  summary: User session projection
+                  value:
+                    projection_id: 01234567-89ab-cdef-0123-456789abcdef
+                    projection_type: user_session
+                    aggregate_id: user-123
+                    state:
+                      user_id: user-123
+                      ip: 192.168.1.1
+                    last_event_id: 01234567-89ab-cdef-0123-456789abcdef
+                    last_event_timestamp: "2026-02-06T10:30:00Z"
+                    updated_at: "2026-02-06T10:30:00Z"
+        '404':
+          description: Projection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: projection not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/projections/{projection_type}:
+    get:
+      summary: List projections by type
+      description: |
+        Lists all projections of a given type.
+        Supports pagination via limit and offset parameters.
+      operationId: listProjections
+      tags:
+        - Projections
+      parameters:
+        - name: projection_type
+          in: path
+          required: true
+          description: Type of projections to list
+          schema:
+            type: string
+            enum:
+              - sensor_state
+              - user_session
+          example: sensor_state
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: offset
+          in: query
+          required: false
+          description: Number of results to skip (for pagination)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+      responses:
+        '200':
+          description: List of projections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectionList'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health status
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+
+components:
+  schemas:
+    Projection:
+      type: object
+      properties:
+        projection_id:
+          type: string
+          format: uuid
+          description: Unique identifier for the projection record
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        projection_type:
+          type: string
+          description: Type of projection
+          example: sensor_state
+        aggregate_id:
+          type: string
+          description: Aggregate ID this projection represents
+          example: device-001
+        state:
+          type: object
+          description: Projection state (varies by projection_type)
+          additionalProperties: true
+        last_event_id:
+          type: string
+          format: uuid
+          description: ID of the last event that updated this projection
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        last_event_timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the last event that updated this projection
+          example: "2026-02-06T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: When the projection was last updated
+          example: "2026-02-06T10:30:00Z"
+
+    ProjectionList:
+      type: object
+      properties:
+        projections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Projection'
+        total:
+          type: integer
+          description: Total number of projections of this type
+          example: 42
+        limit:
+          type: integer
+          description: Maximum results returned
+          example: 20
+        offset:
+          type: integer
+          description: Number of results skipped
+          example: 0
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - unhealthy
+          example: healthy
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: projection not found
