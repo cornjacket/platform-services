@@ -16,6 +16,7 @@ import (
 	"github.com/cornjacket/platform-services/internal/services/eventhandler"
 	"github.com/cornjacket/platform-services/internal/services/ingestion"
 	"github.com/cornjacket/platform-services/internal/services/outbox"
+	"github.com/cornjacket/platform-services/internal/services/query"
 	"github.com/cornjacket/platform-services/internal/shared/config"
 	"github.com/cornjacket/platform-services/internal/shared/infra/postgres"
 	"github.com/cornjacket/platform-services/internal/shared/infra/redpanda"
@@ -166,7 +167,41 @@ func main() {
 		}
 	}()
 
-	// TODO: Initialize and start Query service
+	// Initialize Query Service
+	// Create PostgreSQL client for Query service (reads from Event Handler's database)
+	queryPG, err := postgres.NewClient(ctx, cfg.DatabaseURLQuery, logger)
+	if err != nil {
+		slog.Error("failed to connect to PostgreSQL for query service", "error", err)
+		os.Exit(1)
+	}
+	defer queryPG.Close()
+
+	// Create query projection repository and service
+	queryProjectionRepo := postgres.NewQueryProjectionRepo(queryPG.Pool(), logger)
+	queryService := query.NewService(queryProjectionRepo, logger)
+	queryHandler := query.NewHandler(queryService, logger)
+
+	// Set up HTTP server for query
+	queryMux := http.NewServeMux()
+	queryHandler.RegisterRoutes(queryMux)
+
+	queryServer := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.PortQuery),
+		Handler:      queryMux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Start query server in goroutine
+	go func() {
+		slog.Info("starting query server", "port", cfg.PortQuery)
+		if err := queryServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("query server error", "error", err)
+			cancel()
+		}
+	}()
+
 	// TODO: Initialize and start Actions service
 
 	// Wait for shutdown signal
@@ -188,6 +223,10 @@ func main() {
 
 	if err := ingestionServer.Shutdown(shutdownCtx); err != nil {
 		slog.Error("ingestion server shutdown error", "error", err)
+	}
+
+	if err := queryServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("query server shutdown error", "error", err)
 	}
 
 	slog.Info("platform services stopped")

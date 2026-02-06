@@ -1,6 +1,6 @@
 # Task 005: Query Service
 
-**Status:** Draft
+**Status:** Complete
 **Created:** 2026-02-06
 **Updated:** 2026-02-06
 
@@ -112,13 +112,13 @@ Uses `CJ_QUERY_DATABASE_URL` which defaults to the shared local database.
 
 ## Acceptance Criteria
 
-- [ ] GET `/api/v1/projections/{type}/{id}` returns projection or 404
-- [ ] GET `/api/v1/projections/{type}` returns paginated list
-- [ ] GET `/health` returns `{"status": "healthy"}`
-- [ ] Query Service starts on port 8081 (or `CJ_QUERY_PORT`)
-- [ ] Follows repository pattern (interface in query package, implementation in infra)
-- [ ] Structured logging with slog
-- [ ] API matches `api/openapi/query.yaml` contract
+- [x] GET `/api/v1/projections/{type}/{id}` returns projection or 404
+- [x] GET `/api/v1/projections/{type}` returns paginated list
+- [x] GET `/health` returns `{"status": "healthy"}`
+- [x] Query Service starts on port 8081 (or `CJ_QUERY_PORT`)
+- [x] Follows repository pattern (interface in query package, implementation in infra)
+- [x] Structured logging with slog
+- [x] API matches `api/openapi/query.yaml` contract
 
 ## Testing
 
