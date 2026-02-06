@@ -74,3 +74,4 @@ Open questions, alternatives considered, etc.
 | [003](003-event-handler.md) | Complete | Event Handler (Redpanda consumer → projections) |
 | [004](004-structured-logging.md) | Complete | Configurable Log Level and Format |
 | [005](005-query-service.md) | Complete | Query Service |
+| [006](006-automated-e2e-tests.md) | Complete | Automated End-to-End Tests |
