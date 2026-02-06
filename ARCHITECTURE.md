@@ -4,47 +4,7 @@
 
 This document describes how the codebase aligns with Clean Architecture / Hexagonal (Ports and Adapters) principles.
 
-## Folder Structure
-
-```
-platform-services/
-├── cmd/
-│   └── platform/
-│       └── main.go                    # Composition Root (wiring)
-│
-├── internal/
-│   ├── shared/
-│   │   ├── config/
-│   │   │   └── config.go              # Configuration loading
-│   │   ├── domain/
-│   │   │   ├── events/
-│   │   │   │   └── envelope.go        # Domain model
-│   │   │   └── models/                # Domain models (future)
-│   │   └── infra/
-│   │       ├── http/                  # HTTP client adapters (future)
-│   │       ├── postgres/
-│   │       │   ├── client.go          # DB connection adapter
-│   │       │   └── outbox.go          # OutboxRepository implementation
-│   │       └── redpanda/              # Kafka producer/consumer (future)
-│   │
-│   └── services/
-│       ├── ingestion/
-│       │   ├── handler.go             # HTTP handler (driving adapter)
-│       │   ├── service.go             # Application/Use Case logic
-│       │   ├── repository.go          # Port definition (interface)
-│       │   ├── routes.go              # Route registration
-│       │   └── migrations/            # Service-owned migrations
-│       │
-│       ├── eventhandler/              # Event Handler service (future)
-│       ├── actions/                   # Action Orchestrator (future)
-│       ├── outbox/                    # Outbox Processor (future)
-│       ├── query/                     # Query Service (future)
-│       └── tsdb/                      # TSDB Writer (future)
-│
-├── api/openapi/                       # API definitions (future)
-├── deploy/terraform/                  # Deployment code (future)
-└── pkg/client/                        # Public Go SDK (future)
-```
+For the directory structure, see [DEVELOPMENT.md](DEVELOPMENT.md#project-structure).
 
 ## Layer Mapping
 
