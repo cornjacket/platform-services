@@ -33,6 +33,11 @@ type Config struct {
 	OutboxMaxRetries   int
 	OutboxPollInterval time.Duration
 
+	// Event handler
+	EventHandlerConsumerGroup string
+	EventHandlerTopics        string
+	EventHandlerPollTimeout   time.Duration
+
 	// Feature flags
 	EnableTSDB bool
 }
@@ -62,6 +67,11 @@ func Load() (*Config, error) {
 		OutboxBatchSize:    getEnvInt("OUTBOX_BATCH_SIZE", 100),
 		OutboxMaxRetries:   getEnvInt("OUTBOX_MAX_RETRIES", 5),
 		OutboxPollInterval: getEnvDuration("OUTBOX_POLL_INTERVAL", 5*time.Second),
+
+		// Event handler
+		EventHandlerConsumerGroup: getEnv("EVENTHANDLER_CONSUMER_GROUP", "event-handler"),
+		EventHandlerTopics:        getEnv("EVENTHANDLER_TOPICS", "sensor-events,user-actions,system-events"),
+		EventHandlerPollTimeout:   getEnvDuration("EVENTHANDLER_POLL_TIMEOUT", 1*time.Second),
 
 		// Feature flags
 		EnableTSDB: getEnvBool("ENABLE_TSDB", false),

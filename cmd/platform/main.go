@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/cornjacket/platform-services/internal/services/eventhandler"
 	"github.com/cornjacket/platform-services/internal/services/ingestion"
 	"github.com/cornjacket/platform-services/internal/services/outbox"
 	"github.com/cornjacket/platform-services/internal/shared/config"
@@ -124,9 +125,51 @@ func main() {
 		}
 	}()
 
+	// Initialize Event Handler
+	// Create PostgreSQL client for Event Handler service
+	eventHandlerPG, err := postgres.NewClient(ctx, cfg.DatabaseURLEventHandler, logger)
+	if err != nil {
+		slog.Error("failed to connect to PostgreSQL for event handler", "error", err)
+		os.Exit(1)
+	}
+	defer eventHandlerPG.Close()
+
+	// Create projection repository
+	projectionRepo := postgres.NewProjectionRepo(eventHandlerPG.Pool(), logger)
+
+	// Create handler registry and register handlers
+	handlerRegistry := eventhandler.NewHandlerRegistry(logger)
+	handlerRegistry.Register("sensor.", eventhandler.NewSensorHandler(projectionRepo, logger))
+	handlerRegistry.Register("user.", eventhandler.NewUserHandler(projectionRepo, logger))
+
+	// Create event consumer
+	topics := strings.Split(cfg.EventHandlerTopics, ",")
+	eventConsumer, err := eventhandler.NewConsumer(
+		handlerRegistry,
+		eventhandler.ConsumerConfig{
+			Brokers:     brokers,
+			GroupID:     cfg.EventHandlerConsumerGroup,
+			Topics:      topics,
+			PollTimeout: cfg.EventHandlerPollTimeout,
+		},
+		logger,
+	)
+	if err != nil {
+		slog.Error("failed to create event consumer", "error", err)
+		os.Exit(1)
+	}
+	defer eventConsumer.Close()
+
+	// Start event consumer in goroutine
+	go func() {
+		if err := eventConsumer.Start(ctx); err != nil {
+			slog.Error("event consumer error", "error", err)
+			cancel()
+		}
+	}()
+
 	// TODO: Initialize and start Query service
 	// TODO: Initialize and start Actions service
-	// TODO: Start Event handler consumer
 
 	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)

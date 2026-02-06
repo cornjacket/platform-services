@@ -1,6 +1,6 @@
 # Task 003: Event Handler
 
-**Status:** Ready
+**Status:** Complete
 **Created:** 2026-02-05
 **Updated:** 2026-02-05
 
@@ -201,13 +201,13 @@ groupID := "event-handler"
 
 ## Acceptance Criteria
 
-- [ ] Consumer subscribes to Redpanda topics on startup
-- [ ] Events are consumed and dispatched to handlers
-- [ ] Projections table is updated with event data
-- [ ] Duplicate events are handled idempotently (no duplicate updates)
-- [ ] Consumer offset is committed after successful processing
-- [ ] Graceful shutdown completes in-flight processing
-- [ ] Unknown event types are logged and skipped (not errors)
+- [x] Consumer subscribes to Redpanda topics on startup
+- [x] Events are consumed and dispatched to handlers
+- [x] Projections table is updated with event data
+- [x] Duplicate events are handled idempotently (no duplicate updates)
+- [x] Consumer offset is committed after successful processing
+- [x] Graceful shutdown completes in-flight processing
+- [x] Unknown event types are logged and skipped (not errors)
 
 ## Design Decisions
 

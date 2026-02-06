@@ -219,12 +219,12 @@ make migrate-all
 # Ingest an event
 curl -X POST http://localhost:8080/api/v1/events \
   -H "Content-Type: application/json" \
-  -d '{"event_type":"sensor.reading","aggregate_id":"device-001","payload":{"temperature":72.5}}'
+  -d '{"event_type":"sensor.reading","aggregate_id":"device-001","payload":{"value":72.5,"unit":"fahrenheit"}}'
 
 # Expected response:
 # {"event_id":"<uuid>","status":"accepted"}
 
-# Verify the event is in the outbox
+# Verify the event is in the outbox (should be empty after processing)
 docker compose exec postgres psql -U cornjacket -d cornjacket -c "SELECT * FROM outbox;"
 
 # Check health endpoint
@@ -232,6 +232,69 @@ curl http://localhost:8080/health
 ```
 
 **Note:** When using backslash line continuation in zsh/bash, ensure there are no trailing spaces after `\`.
+
+### Testing End-to-End Event Flow
+
+The full event flow: HTTP → Ingestion → Outbox → Event Store + Redpanda → Event Handler → Projections
+
+```bash
+# 1. Ingest a sensor.reading event
+curl -X POST http://localhost:8080/api/v1/events \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"sensor.reading","aggregate_id":"device-001","payload":{"value":72.5,"unit":"fahrenheit"}}'
+
+# 2. Ingest a user.login event
+curl -X POST http://localhost:8080/api/v1/events \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"user.login","aggregate_id":"user-123","payload":{"user_id":"user-123","ip":"192.168.1.1"}}'
+
+# 3. Wait for processing (typically < 1 second)
+sleep 2
+
+# 4. Verify projections were created
+docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+  "SELECT projection_type, aggregate_id, state FROM projections ORDER BY projection_type;"
+
+# Expected output:
+#  projection_type | aggregate_id |                    state
+# -----------------+--------------+----------------------------------------------
+#  sensor_state    | device-001   | {"unit": "fahrenheit", "value": 72.5}
+#  user_session    | user-123     | {"ip": "192.168.1.1", "user_id": "user-123"}
+
+# 5. Verify event is in event_store
+docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+  "SELECT event_id, event_type, aggregate_id FROM event_store ORDER BY timestamp DESC LIMIT 5;"
+
+# 6. Verify outbox is empty (all events processed)
+docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+  "SELECT COUNT(*) FROM outbox;"
+# Expected: 0
+
+# 7. Test projection update (send newer event for same aggregate)
+curl -X POST http://localhost:8080/api/v1/events \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"sensor.reading","aggregate_id":"device-001","payload":{"value":75.0,"unit":"fahrenheit"}}'
+
+sleep 2
+
+# 8. Verify projection was updated
+docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+  "SELECT state FROM projections WHERE projection_type = 'sensor_state' AND aggregate_id = 'device-001';"
+# Expected: {"unit": "fahrenheit", "value": 75.0}
+```
+
+### Checking Redpanda Messages
+
+```bash
+# List topics
+docker compose exec redpanda rpk topic list
+
+# Consume messages from sensor-events topic
+docker compose exec redpanda rpk topic consume sensor-events --num 5
+
+# Consume messages from user-actions topic
+docker compose exec redpanda rpk topic consume user-actions --num 5
+```
 
 ### Running Tests
 
@@ -272,11 +335,33 @@ Each service receives its own database URL. In dev, all default to the same data
 
 Default: `postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable`
 
-### Other Configuration
+### Redpanda Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDPANDA_BROKERS` | localhost:9092 | Kafka broker addresses |
+
+### Outbox Processor Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OUTBOX_WORKER_COUNT` | 4 | Number of worker goroutines |
+| `OUTBOX_BATCH_SIZE` | 100 | Max entries per fetch |
+| `OUTBOX_MAX_RETRIES` | 5 | Max retry attempts |
+| `OUTBOX_POLL_INTERVAL` | 5s | Watchdog timer interval |
+
+### Event Handler Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EVENTHANDLER_CONSUMER_GROUP` | event-handler | Kafka consumer group ID |
+| `EVENTHANDLER_TOPICS` | sensor-events,user-actions,system-events | Comma-separated topics |
+| `EVENTHANDLER_POLL_TIMEOUT` | 1s | Poll timeout |
+
+### Feature Flags
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `ENABLE_TSDB` | false | Enable TSDB writer |
 
 ## Coding Conventions
