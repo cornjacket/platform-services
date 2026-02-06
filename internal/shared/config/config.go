@@ -43,38 +43,40 @@ type Config struct {
 }
 
 // Load reads configuration from environment variables with sensible defaults.
+// Environment variable naming convention: CJ_[SERVICE]_[VARIABLE_NAME]
+// See design-spec.md section 12 for complete reference.
 func Load() (*Config, error) {
 	cfg := &Config{
 		// Server ports
-		PortIngestion: getEnvInt("PORT_INGESTION", 8080),
-		PortQuery:     getEnvInt("PORT_QUERY", 8081),
-		PortActions:   getEnvInt("PORT_ACTIONS", 8083), // Note: 8082 used by Redpanda Pandaproxy locally
+		PortIngestion: getEnvInt("CJ_INGESTION_PORT", 8080),
+		PortQuery:     getEnvInt("CJ_QUERY_PORT", 8081),
+		PortActions:   getEnvInt("CJ_ACTIONS_PORT", 8083), // Note: 8082 used by Redpanda Pandaproxy locally
 
 		// Per-service database URLs
 		// In dev, all default to the same database
 		// In prod, each service gets its own database
-		DatabaseURLIngestion:    getEnv("INGESTION_DATABASE_URL", defaultDatabaseURL),
-		DatabaseURLEventHandler: getEnv("EVENTHANDLER_DATABASE_URL", defaultDatabaseURL),
-		DatabaseURLQuery:        getEnv("QUERY_DATABASE_URL", defaultDatabaseURL),
-		DatabaseURLTSDB:         getEnv("TSDB_DATABASE_URL", defaultDatabaseURL),
-		DatabaseURLActions:      getEnv("ACTIONS_DATABASE_URL", defaultDatabaseURL),
+		DatabaseURLIngestion:    getEnv("CJ_INGESTION_DATABASE_URL", defaultDatabaseURL),
+		DatabaseURLEventHandler: getEnv("CJ_EVENTHANDLER_DATABASE_URL", defaultDatabaseURL),
+		DatabaseURLQuery:        getEnv("CJ_QUERY_DATABASE_URL", defaultDatabaseURL),
+		DatabaseURLTSDB:         getEnv("CJ_TSDB_DATABASE_URL", defaultDatabaseURL),
+		DatabaseURLActions:      getEnv("CJ_ACTIONS_DATABASE_URL", defaultDatabaseURL),
 
 		// Redpanda
-		RedpandaBrokers: getEnv("REDPANDA_BROKERS", "localhost:9092"),
+		RedpandaBrokers: getEnv("CJ_REDPANDA_BROKERS", "localhost:9092"),
 
 		// Outbox processor
-		OutboxWorkerCount:  getEnvInt("OUTBOX_WORKER_COUNT", 4),
-		OutboxBatchSize:    getEnvInt("OUTBOX_BATCH_SIZE", 100),
-		OutboxMaxRetries:   getEnvInt("OUTBOX_MAX_RETRIES", 5),
-		OutboxPollInterval: getEnvDuration("OUTBOX_POLL_INTERVAL", 5*time.Second),
+		OutboxWorkerCount:  getEnvInt("CJ_OUTBOX_WORKER_COUNT", 4),
+		OutboxBatchSize:    getEnvInt("CJ_OUTBOX_BATCH_SIZE", 100),
+		OutboxMaxRetries:   getEnvInt("CJ_OUTBOX_MAX_RETRIES", 5),
+		OutboxPollInterval: getEnvDuration("CJ_OUTBOX_POLL_INTERVAL", 5*time.Second),
 
 		// Event handler
-		EventHandlerConsumerGroup: getEnv("EVENTHANDLER_CONSUMER_GROUP", "event-handler"),
-		EventHandlerTopics:        getEnv("EVENTHANDLER_TOPICS", "sensor-events,user-actions,system-events"),
-		EventHandlerPollTimeout:   getEnvDuration("EVENTHANDLER_POLL_TIMEOUT", 1*time.Second),
+		EventHandlerConsumerGroup: getEnv("CJ_EVENTHANDLER_CONSUMER_GROUP", "event-handler"),
+		EventHandlerTopics:        getEnv("CJ_EVENTHANDLER_TOPICS", "sensor-events,user-actions,system-events"),
+		EventHandlerPollTimeout:   getEnvDuration("CJ_EVENTHANDLER_POLL_TIMEOUT", 1*time.Second),
 
 		// Feature flags
-		EnableTSDB: getEnvBool("ENABLE_TSDB", false),
+		EnableTSDB: getEnvBool("CJ_FEATURE_TSDB", false),
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -86,10 +88,10 @@ func Load() (*Config, error) {
 
 func (c *Config) validate() error {
 	if c.DatabaseURLIngestion == "" {
-		return fmt.Errorf("INGESTION_DATABASE_URL is required")
+		return fmt.Errorf("CJ_INGESTION_DATABASE_URL is required")
 	}
 	if c.RedpandaBrokers == "" {
-		return fmt.Errorf("REDPANDA_BROKERS is required")
+		return fmt.Errorf("CJ_REDPANDA_BROKERS is required")
 	}
 	return nil
 }

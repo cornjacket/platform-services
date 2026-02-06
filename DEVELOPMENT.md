@@ -311,58 +311,35 @@ go test -tags=component ./...
 
 ## Configuration
 
-Configuration is loaded from environment variables. See `internal/shared/config/config.go` for all options.
+Configuration is loaded from environment variables with the naming convention `CJ_[SERVICE]_[VARIABLE_NAME]`.
 
-### Server Ports
+**Complete reference:** See [design-spec.md section 12](../platform-docs/design-spec.md#12-environment-variables) for all variables, defaults, and per-environment values.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT_INGESTION` | 8080 | Ingestion service port |
-| `PORT_QUERY` | 8081 | Query service port |
-| `PORT_ACTIONS` | 8083 | Actions service port |
+### Local Development Defaults
 
-### Per-Service Database URLs (ADR-0010)
-
-Each service receives its own database URL. In dev, all default to the same database.
-
-| Variable | Default | Service |
-|----------|---------|---------|
-| `INGESTION_DATABASE_URL` | localhost cornjacket | Ingestion + Outbox Processor |
-| `EVENTHANDLER_DATABASE_URL` | localhost cornjacket | Event Handler |
-| `QUERY_DATABASE_URL` | localhost cornjacket | Query Service |
-| `TSDB_DATABASE_URL` | localhost cornjacket | TSDB Writer |
-| `ACTIONS_DATABASE_URL` | localhost cornjacket | Action Orchestrator |
-
-Default: `postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable`
-
-### Redpanda Configuration
+All defaults are configured for local development — no environment variables needed to run locally.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDPANDA_BROKERS` | localhost:9092 | Kafka broker addresses |
+| `CJ_INGESTION_PORT` | 8080 | Ingestion service port |
+| `CJ_QUERY_PORT` | 8081 | Query service port |
+| `CJ_ACTIONS_PORT` | 8083 | Actions service port |
+| `CJ_INGESTION_DATABASE_URL` | localhost:5432/cornjacket | PostgreSQL connection |
+| `CJ_REDPANDA_BROKERS` | localhost:9092 | Kafka broker addresses |
 
-### Outbox Processor Configuration
+### Overriding Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OUTBOX_WORKER_COUNT` | 4 | Number of worker goroutines |
-| `OUTBOX_BATCH_SIZE` | 100 | Max entries per fetch |
-| `OUTBOX_MAX_RETRIES` | 5 | Max retry attempts |
-| `OUTBOX_POLL_INTERVAL` | 5s | Watchdog timer interval |
+To override any setting, export the environment variable before running:
 
-### Event Handler Configuration
+```bash
+# Example: change ingestion port
+export CJ_INGESTION_PORT=9080
+go run ./cmd/platform
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `EVENTHANDLER_CONSUMER_GROUP` | event-handler | Kafka consumer group ID |
-| `EVENTHANDLER_TOPICS` | sensor-events,user-actions,system-events | Comma-separated topics |
-| `EVENTHANDLER_POLL_TIMEOUT` | 1s | Poll timeout |
-
-### Feature Flags
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENABLE_TSDB` | false | Enable TSDB writer |
+# Example: use different database
+export CJ_INGESTION_DATABASE_URL="postgres://user:pass@host:5432/db?sslmode=require"
+go run ./cmd/platform
+```
 
 ## Coding Conventions
 
