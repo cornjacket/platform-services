@@ -22,18 +22,16 @@ import (
 )
 
 func main() {
-	// Initialize structured logger
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-	slog.SetDefault(logger)
-
-	// Load configuration
+	// Load configuration first (errors go to stderr)
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("failed to load configuration", "error", err)
+		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Initialize structured logger from config
+	logger := newLogger(cfg.LogLevel, cfg.LogFormat)
+	slog.SetDefault(logger)
 
 	slog.Info("starting platform services",
 		"ingestion_port", cfg.PortIngestion,
@@ -193,4 +191,30 @@ func main() {
 	}
 
 	slog.Info("platform services stopped")
+}
+
+// newLogger creates a structured logger based on configuration.
+func newLogger(level, format string) *slog.Logger {
+	var logLevel slog.Level
+	switch level {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	default:
+		logLevel = slog.LevelInfo
+	}
+
+	opts := &slog.HandlerOptions{Level: logLevel}
+
+	var handler slog.Handler
+	if format == "text" {
+		handler = slog.NewTextHandler(os.Stdout, opts)
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, opts)
+	}
+
+	return slog.New(handler)
 }

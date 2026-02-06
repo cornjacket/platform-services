@@ -12,6 +12,10 @@ const defaultDatabaseURL = "postgres://cornjacket:cornjacket@localhost:5432/corn
 
 // Config holds all configuration for the platform services.
 type Config struct {
+	// Logging
+	LogLevel  string
+	LogFormat string
+
 	// Server ports
 	PortIngestion int
 	PortQuery     int
@@ -47,6 +51,10 @@ type Config struct {
 // See design-spec.md section 12 for complete reference.
 func Load() (*Config, error) {
 	cfg := &Config{
+		// Logging
+		LogLevel:  getEnv("CJ_LOG_LEVEL", "info"),
+		LogFormat: getEnv("CJ_LOG_FORMAT", "json"),
+
 		// Server ports
 		PortIngestion: getEnvInt("CJ_INGESTION_PORT", 8080),
 		PortQuery:     getEnvInt("CJ_QUERY_PORT", 8081),

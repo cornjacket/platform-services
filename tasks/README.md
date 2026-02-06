@@ -72,3 +72,4 @@ Open questions, alternatives considered, etc.
 | [001](001-outbox-processor.md) | Complete | Outbox Processor (NOTIFY/LISTEN) |
 | [002](002-uuid-v7-migration.md) | Complete | UUID v7 Migration |
 | [003](003-event-handler.md) | Complete | Event Handler (Redpanda consumer → projections) |
+| [004](004-structured-logging.md) | Complete | Configurable Log Level and Format |
