@@ -1,6 +1,6 @@
 # Platform Services - Architecture
 
-**Last Audited:** 2026-02-05
+**Last Audited:** 2026-02-06
 
 This document describes how the codebase aligns with Clean Architecture / Hexagonal (Ports and Adapters) principles.
 
@@ -11,10 +11,12 @@ For the directory structure, see [DEVELOPMENT.md](DEVELOPMENT.md#project-structu
 | Clean Architecture Layer | Location | Example |
 |--------------------------|----------|---------|
 | **Entities (Domain)** | `internal/shared/domain/` | `events/envelope.go` |
+| **Shared Domain** | `internal/shared/projections/` | `store.go`, `postgres.go` |
 | **Use Cases (Application)** | `internal/services/*/service.go` | `ingestion/service.go` |
 | **Ports (Interfaces)** | `internal/services/*/repository.go` | `ingestion/repository.go` |
 | **Driving Adapters** | `internal/services/*/handler.go` | `ingestion/handler.go` |
 | **Driven Adapters** | `internal/shared/infra/` | `postgres/outbox.go` |
+| **Client Libraries** | `internal/client/` | `eventhandler/client.go` |
 | **Composition Root** | `cmd/platform/main.go` | Wiring |
 
 ## Dependency Rules
@@ -47,10 +49,12 @@ For the directory structure, see [DEVELOPMENT.md](DEVELOPMENT.md#project-structu
 | Package | May Import | Must NOT Import |
 |---------|------------|-----------------|
 | `domain/*` | stdlib only | anything in `internal/` |
-| `services/*/service.go` | `domain/*` | `infra/*`, other services |
+| `shared/projections` | `domain/*` | `services/*`, `infra/*` |
+| `services/*/service.go` | `domain/*`, `shared/projections` | `infra/*`, other services |
 | `services/*/handler.go` | same service only | `infra/*`, `domain/*` directly |
-| `services/*/repository.go` | `domain/*` | `infra/*` |
-| `infra/*` | `domain/*` | `services/*` |
+| `services/*/repository.go` | `domain/*`, `shared/projections` | `infra/*` |
+| `client/*` | `domain/*`, `infra/*` | `services/*` |
+| `infra/*` | `domain/*`, `services/*/worker` | `services/*/service.go` |
 | `cmd/platform` | everything | — |
 
 ### Current Import Verification
@@ -59,17 +63,26 @@ For the directory structure, see [DEVELOPMENT.md](DEVELOPMENT.md#project-structu
 domain/events/envelope.go
     └── imports: stdlib + github.com/gofrs/uuid/v5   ✅
 
+shared/projections/store.go
+    └── imports: domain/events                       ✅
+
 services/ingestion/service.go
     └── imports: domain/events                       ✅
 
-services/ingestion/repository.go
+services/ingestion/worker/processor.go
+    └── imports: (interfaces only)                   ✅
+
+services/eventhandler/handlers.go
     └── imports: domain/events                       ✅
 
-services/ingestion/handler.go
-    └── imports: (nothing external)                  ✅
+services/query/service.go
+    └── imports: shared/projections                  ✅
+
+client/eventhandler/client.go
+    └── imports: domain/events                       ✅
 
 infra/postgres/outbox.go
-    └── imports: domain/events                       ✅
+    └── imports: domain/events, services/worker      ✅
 ```
 
 ## Ports and Adapters
@@ -138,21 +151,15 @@ type Handler struct {
 
 **Why it's OK for now:** Go idiom for internal code. Can add interface if testing requires it.
 
-### 3. OutboxEntry Defined in Infrastructure (Medium Severity)
+### 3. Single-Instance Ingestion Worker (Medium Severity)
 
-`OutboxEntry` in `postgres/outbox.go` will be needed by the Outbox Processor service. May need to move to domain or become a port type.
-
-**Action:** Address when implementing Outbox Processor.
-
-### 4. Single-Instance Outbox Processor (Medium Severity)
-
-The Outbox Processor uses a dispatcher + worker pool pattern that does not support horizontal scaling across multiple instances. Running multiple instances would cause duplicate processing.
+The Ingestion Worker (formerly Outbox Processor) uses a dispatcher + worker pool pattern that does not support horizontal scaling across multiple instances. Running multiple instances would cause duplicate processing.
 
 **Why it's OK for now:** Dev environment runs single instance. Throughput target is ~10 events/sec.
 
 **Action:** See [ADR-0012](../platform-docs/decisions/0012-outbox-processing-strategy.md) for future scaling paths (row locking or SQS migration).
 
-### 5. No Alerting for Retry Exhaustion (High Severity)
+### 4. No Alerting for Retry Exhaustion (High Severity)
 
 When outbox entries exhaust retries, no alert is triggered. These failures will go unnoticed until manual inspection.
 
@@ -164,7 +171,7 @@ When outbox entries exhaust retries, no alert is triggered. These failures will 
 
 See [Task 001](tasks/001-outbox-processor.md) for rationale on why DLQ was omitted.
 
-### 6. Non-Atomic Outbox Processing (Low Severity)
+### 5. Non-Atomic Event Processing (Low Severity)
 
 Event store write and outbox delete are separate operations, not in a single transaction. If delete fails after successful write, the entry will be reprocessed.
 
@@ -172,7 +179,7 @@ Event store write and outbox delete are separate operations, not in a single tra
 
 **Action:** Monitor for data inconsistencies in production. If observed, consider wrapping event store write + outbox delete in a transaction (Redpanda publish would remain outside).
 
-### 7. Single-Consumer Event Handler (Medium Severity)
+### 6. Single-Consumer Event Handler (Medium Severity)
 
 The Event Handler uses a single consumer subscribing to all topics. This does not support horizontal scaling — running multiple instances would cause duplicate processing within the same consumer group.
 

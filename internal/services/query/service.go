@@ -14,14 +14,14 @@ var validProjectionTypes = map[string]bool{
 
 // Service handles query business logic.
 type Service struct {
-	repo   ProjectionRepository
+	store  ProjectionReader
 	logger *slog.Logger
 }
 
 // NewService creates a new query service.
-func NewService(repo ProjectionRepository, logger *slog.Logger) *Service {
+func NewService(store ProjectionReader, logger *slog.Logger) *Service {
 	return &Service{
-		repo:   repo,
+		store:  store,
 		logger: logger.With("service", "query"),
 	}
 }
@@ -32,7 +32,7 @@ func (s *Service) GetProjection(ctx context.Context, projectionType, aggregateID
 		return nil, fmt.Errorf("invalid projection type: %s", projectionType)
 	}
 
-	projection, err := s.repo.Get(ctx, projectionType, aggregateID)
+	storeProjection, err := s.store.GetProjection(ctx, projectionType, aggregateID)
 	if err != nil {
 		s.logger.Error("failed to get projection",
 			"projection_type", projectionType,
@@ -42,7 +42,7 @@ func (s *Service) GetProjection(ctx context.Context, projectionType, aggregateID
 		return nil, err
 	}
 
-	return projection, nil
+	return fromStoreProjection(storeProjection), nil
 }
 
 // ListProjections retrieves projections by type with pagination.
@@ -62,7 +62,7 @@ func (s *Service) ListProjections(ctx context.Context, projectionType string, li
 		offset = 0
 	}
 
-	projections, total, err := s.repo.List(ctx, projectionType, limit, offset)
+	storeProjections, total, err := s.store.ListProjections(ctx, projectionType, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list projections",
 			"projection_type", projectionType,
@@ -74,7 +74,7 @@ func (s *Service) ListProjections(ctx context.Context, projectionType string, li
 	}
 
 	return &ProjectionList{
-		Projections: projections,
+		Projections: fromStoreProjections(storeProjections),
 		Total:       total,
 		Limit:       limit,
 		Offset:      offset,

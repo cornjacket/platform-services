@@ -1,10 +1,9 @@
-package outbox
+package worker
 
 import (
 	"context"
 	"errors"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// ProcessorConfig holds configuration for the outbox processor.
+// ProcessorConfig holds configuration for the worker processor.
 type ProcessorConfig struct {
 	WorkerCount  int
 	BatchSize    int
@@ -20,21 +19,21 @@ type ProcessorConfig struct {
 	PollInterval time.Duration
 }
 
-// Processor processes outbox entries.
+// Processor processes outbox entries and submits events to EventHandler.
 type Processor struct {
 	outbox     OutboxReader
 	eventStore EventStoreWriter
-	publisher  EventPublisher
+	submitter  EventSubmitter
 	listenConn *pgx.Conn
 	config     ProcessorConfig
 	logger     *slog.Logger
 }
 
-// NewProcessor creates a new outbox processor.
+// NewProcessor creates a new worker processor.
 func NewProcessor(
 	outbox OutboxReader,
 	eventStore EventStoreWriter,
-	publisher EventPublisher,
+	submitter EventSubmitter,
 	listenConn *pgx.Conn,
 	config ProcessorConfig,
 	logger *slog.Logger,
@@ -42,17 +41,17 @@ func NewProcessor(
 	return &Processor{
 		outbox:     outbox,
 		eventStore: eventStore,
-		publisher:  publisher,
+		submitter:  submitter,
 		listenConn: listenConn,
 		config:     config,
-		logger:     logger.With("component", "outbox-processor"),
+		logger:     logger.With("component", "ingestion-worker"),
 	}
 }
 
 // Start begins processing outbox entries.
 // It blocks until the context is cancelled.
 func (p *Processor) Start(ctx context.Context) error {
-	p.logger.Info("starting outbox processor",
+	p.logger.Info("starting ingestion worker",
 		"workers", p.config.WorkerCount,
 		"batch_size", p.config.BatchSize,
 		"poll_interval", p.config.PollInterval,
@@ -87,7 +86,7 @@ func (p *Processor) Start(ctx context.Context) error {
 	close(workCh)
 	wg.Wait()
 
-	p.logger.Info("outbox processor stopped")
+	p.logger.Info("ingestion worker stopped")
 	return nil
 }
 
@@ -212,7 +211,7 @@ func (p *Processor) processEntry(ctx context.Context, logger *slog.Logger, entry
 	if err != nil {
 		// Check if it's a duplicate (unique constraint violation)
 		if isDuplicateError(err) {
-			logger.Debug("event already in event store, skipping to delete")
+			logger.Debug("event already in event store, skipping to submit")
 		} else {
 			logger.Error("failed to write to event store", "error", err)
 			p.outbox.IncrementRetry(ctx, entry.OutboxID)
@@ -220,11 +219,10 @@ func (p *Processor) processEntry(ctx context.Context, logger *slog.Logger, entry
 		}
 	}
 
-	// Step 2: Publish to Redpanda
-	topic := topicFromEventType(entry.Payload.EventType)
-	err = p.publisher.Publish(ctx, topic, entry.Payload)
+	// Step 2: Submit to EventHandler
+	err = p.submitter.SubmitEvent(ctx, entry.Payload)
 	if err != nil {
-		logger.Error("failed to publish to Redpanda", "error", err, "topic", topic)
+		logger.Error("failed to submit event to EventHandler", "error", err)
 		p.outbox.IncrementRetry(ctx, entry.OutboxID)
 		return
 	}
@@ -237,19 +235,7 @@ func (p *Processor) processEntry(ctx context.Context, logger *slog.Logger, entry
 		return
 	}
 
-	logger.Info("event processed successfully", "topic", topic)
-}
-
-// topicFromEventType derives the Redpanda topic from the event type.
-func topicFromEventType(eventType string) string {
-	switch {
-	case strings.HasPrefix(eventType, "sensor."):
-		return "sensor-events"
-	case strings.HasPrefix(eventType, "user."):
-		return "user-actions"
-	default:
-		return "system-events"
-	}
+	logger.Info("event processed successfully")
 }
 
 // isDuplicateError checks if the error is a unique constraint violation.

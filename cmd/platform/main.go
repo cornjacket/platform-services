@@ -13,13 +13,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	ehclient "github.com/cornjacket/platform-services/internal/client/eventhandler"
 	"github.com/cornjacket/platform-services/internal/services/eventhandler"
 	"github.com/cornjacket/platform-services/internal/services/ingestion"
-	"github.com/cornjacket/platform-services/internal/services/outbox"
+	"github.com/cornjacket/platform-services/internal/services/ingestion/worker"
 	"github.com/cornjacket/platform-services/internal/services/query"
 	"github.com/cornjacket/platform-services/internal/shared/config"
 	"github.com/cornjacket/platform-services/internal/shared/infra/postgres"
 	"github.com/cornjacket/platform-services/internal/shared/infra/redpanda"
+	"github.com/cornjacket/platform-services/internal/shared/projections"
 )
 
 func main() {
@@ -80,7 +82,7 @@ func main() {
 		}
 	}()
 
-	// Initialize Outbox Processor
+	// Initialize Ingestion Worker (formerly Outbox Processor)
 	// Create dedicated LISTEN connection (not from pool)
 	listenConn, err := pgx.Connect(ctx, cfg.DatabaseURLIngestion)
 	if err != nil {
@@ -101,13 +103,16 @@ func main() {
 	}
 	defer redpandaProducer.Close()
 
-	// Create outbox processor
-	outboxProcessor := outbox.NewProcessor(
+	// Create EventHandler client (wraps Redpanda producer)
+	eventHandlerClient := ehclient.New(redpandaProducer, logger)
+
+	// Create ingestion worker processor
+	ingestionWorker := worker.NewProcessor(
 		postgres.NewOutboxReaderAdapter(ingestionPG.Pool(), logger),
 		eventStoreRepo,
-		redpandaProducer,
+		eventHandlerClient,
 		listenConn,
-		outbox.ProcessorConfig{
+		worker.ProcessorConfig{
 			WorkerCount:  cfg.OutboxWorkerCount,
 			BatchSize:    cfg.OutboxBatchSize,
 			MaxRetries:   cfg.OutboxMaxRetries,
@@ -116,10 +121,10 @@ func main() {
 		logger,
 	)
 
-	// Start outbox processor in goroutine
+	// Start ingestion worker in goroutine
 	go func() {
-		if err := outboxProcessor.Start(ctx); err != nil {
-			slog.Error("outbox processor error", "error", err)
+		if err := ingestionWorker.Start(ctx); err != nil {
+			slog.Error("ingestion worker error", "error", err)
 			cancel()
 		}
 	}()
@@ -133,13 +138,13 @@ func main() {
 	}
 	defer eventHandlerPG.Close()
 
-	// Create projection repository
-	projectionRepo := postgres.NewProjectionRepo(eventHandlerPG.Pool(), logger)
+	// Create shared projections store
+	projectionsStore := projections.NewPostgresStore(eventHandlerPG.Pool(), logger)
 
 	// Create handler registry and register handlers
 	handlerRegistry := eventhandler.NewHandlerRegistry(logger)
-	handlerRegistry.Register("sensor.", eventhandler.NewSensorHandler(projectionRepo, logger))
-	handlerRegistry.Register("user.", eventhandler.NewUserHandler(projectionRepo, logger))
+	handlerRegistry.Register("sensor.", eventhandler.NewSensorHandler(projectionsStore, logger))
+	handlerRegistry.Register("user.", eventhandler.NewUserHandler(projectionsStore, logger))
 
 	// Create event consumer
 	topics := strings.Split(cfg.EventHandlerTopics, ",")
@@ -176,9 +181,9 @@ func main() {
 	}
 	defer queryPG.Close()
 
-	// Create query projection repository and service
-	queryProjectionRepo := postgres.NewQueryProjectionRepo(queryPG.Pool(), logger)
-	queryService := query.NewService(queryProjectionRepo, logger)
+	// Create query projections store and service
+	queryProjectionsStore := projections.NewPostgresStore(queryPG.Pool(), logger)
+	queryService := query.NewService(queryProjectionsStore, logger)
 	queryHandler := query.NewHandler(queryService, logger)
 
 	// Set up HTTP server for query

@@ -42,21 +42,21 @@ func (r *HandlerRegistry) Dispatch(ctx context.Context, event *events.Envelope) 
 
 // SensorHandler processes sensor.* events.
 type SensorHandler struct {
-	repo   ProjectionRepository
+	store  ProjectionWriter
 	logger *slog.Logger
 }
 
 // NewSensorHandler creates a new sensor event handler.
-func NewSensorHandler(repo ProjectionRepository, logger *slog.Logger) *SensorHandler {
+func NewSensorHandler(store ProjectionWriter, logger *slog.Logger) *SensorHandler {
 	return &SensorHandler{
-		repo:   repo,
+		store:  store,
 		logger: logger.With("handler", "sensor"),
 	}
 }
 
 // Handle processes a sensor event and updates the sensor_state projection.
 func (h *SensorHandler) Handle(ctx context.Context, event *events.Envelope) error {
-	err := h.repo.Upsert(ctx, "sensor_state", event.AggregateID, event.Payload, event)
+	err := h.store.WriteProjection(ctx, "sensor_state", event.AggregateID, event.Payload, event)
 	if err != nil {
 		h.logger.Error("failed to update sensor_state projection",
 			"event_id", event.EventID,
@@ -75,21 +75,21 @@ func (h *SensorHandler) Handle(ctx context.Context, event *events.Envelope) erro
 
 // UserHandler processes user.* events.
 type UserHandler struct {
-	repo   ProjectionRepository
+	store  ProjectionWriter
 	logger *slog.Logger
 }
 
 // NewUserHandler creates a new user event handler.
-func NewUserHandler(repo ProjectionRepository, logger *slog.Logger) *UserHandler {
+func NewUserHandler(store ProjectionWriter, logger *slog.Logger) *UserHandler {
 	return &UserHandler{
-		repo:   repo,
+		store:  store,
 		logger: logger.With("handler", "user"),
 	}
 }
 
 // Handle processes a user event and updates the user_session projection.
 func (h *UserHandler) Handle(ctx context.Context, event *events.Envelope) error {
-	err := h.repo.Upsert(ctx, "user_session", event.AggregateID, event.Payload, event)
+	err := h.store.WriteProjection(ctx, "user_session", event.AggregateID, event.Payload, event)
 	if err != nil {
 		h.logger.Error("failed to update user_session projection",
 			"event_id", event.EventID,

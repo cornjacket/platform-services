@@ -11,6 +11,10 @@ platform-services/
 │       └── main.go                  # Wires everything, starts servers + workers
 │
 ├── internal/
+│   ├── client/                      # Service client libraries
+│   │   └── eventhandler/            # Client for submitting events to EventHandler
+│   │       └── client.go            # SubmitEvent() - wraps Redpanda publish
+│   │
 │   ├── shared/                      # Shared code (config, domain, infrastructure)
 │   │   ├── config/
 │   │   │   └── config.go            # Env vars, feature flags
@@ -18,15 +22,16 @@ platform-services/
 │   │   │   ├── events/              # Event types and envelope
 │   │   │   │   └── envelope.go
 │   │   │   └── models/              # Domain models
+│   │   ├── projections/             # Shared projection store
+│   │   │   ├── store.go             # Store interface and Projection type
+│   │   │   └── postgres.go          # PostgreSQL implementation
 │   │   └── infra/                   # Infrastructure adapters
 │   │       ├── postgres/
 │   │       │   ├── client.go        # Connection pool, health check
-│   │       │   └── outbox.go        # OutboxRepository implementation
-│   │       ├── redpanda/
-│   │       │   ├── producer.go      # Kafka producer wrapper
-│   │       │   └── consumer.go      # Kafka consumer wrapper
-│   │       └── http/
-│   │           └── webhook.go       # HTTP client for webhook delivery
+│   │       │   ├── outbox.go        # OutboxRepository implementation
+│   │       │   └── eventstore.go    # EventStoreWriter implementation
+│   │       └── redpanda/
+│   │           └── producer.go      # Kafka producer wrapper
 │   │
 │   └── services/                    # Individual services
 │       ├── ingestion/               # Ingestion Service (:8080)
@@ -36,27 +41,39 @@ platform-services/
 │       │   ├── handler.go           # HTTP handlers
 │       │   ├── service.go           # Business logic
 │       │   ├── repository.go        # Interface definitions
-│       │   └── routes.go
+│       │   ├── routes.go
+│       │   └── worker/              # Background worker (outbox processor)
+│       │       ├── processor.go     # Reads outbox, writes event store, submits to EventHandler
+│       │       └── repository.go    # Worker interfaces
 │       │
 │       ├── query/                   # Query Service (:8081)
-│       │
-│       ├── actions/                 # Action Orchestrator (:8083)
+│       │   ├── handler.go           # HTTP handlers
+│       │   ├── service.go           # Business logic
+│       │   ├── repository.go        # Interface definitions
+│       │   └── routes.go
 │       │
 │       ├── eventhandler/            # Event Handler (background worker)
 │       │   ├── migrations/
 │       │   │   ├── 001_create_projections.sql
 │       │   │   └── 002_create_dlq.sql
-│       │   └── ...
+│       │   ├── consumer.go          # Kafka consumer
+│       │   ├── handlers.go          # Event dispatch and handlers
+│       │   └── repository.go        # Interface definitions
 │       │
-│       ├── outbox/                  # Outbox Processor (background worker)
+│       ├── actions/                 # Action Orchestrator (:8083) - future
 │       │
-│       └── tsdb/                    # TSDB Writer (optional)
+│       └── tsdb/                    # TSDB Writer (optional) - future
 │
 ├── pkg/                             # Public libraries (importable by other repos)
-│   └── client/                      # Go client SDK for the platform
+│   └── client/                      # Go client SDK for the platform - future
 │
 ├── api/                             # API definitions
 │   └── openapi/
+│
+├── e2e/                             # End-to-end tests
+│   ├── runner/                      # Test framework
+│   ├── client/                      # HTTP client helpers
+│   └── tests/                       # Test implementations
 │
 ├── deploy/                          # Deployment code
 │   └── terraform/

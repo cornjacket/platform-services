@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/cornjacket/platform-services/internal/services/ingestion/worker"
 	"github.com/cornjacket/platform-services/internal/shared/domain/events"
-	outboxpkg "github.com/cornjacket/platform-services/internal/services/outbox"
 )
 
 // OutboxRepo implements ingestion.OutboxRepository using PostgreSQL.
@@ -128,7 +128,7 @@ func (r *OutboxRepo) IncrementRetry(ctx context.Context, outboxID string) error 
 	return nil
 }
 
-// OutboxReaderAdapter adapts OutboxRepo to the outbox.OutboxReader interface.
+// OutboxReaderAdapter adapts OutboxRepo to the worker.OutboxReader interface.
 type OutboxReaderAdapter struct {
 	repo *OutboxRepo
 }
@@ -140,17 +140,17 @@ func NewOutboxReaderAdapter(pool *pgxpool.Pool, logger *slog.Logger) *OutboxRead
 	}
 }
 
-// FetchPending implements outbox.OutboxReader.
-func (a *OutboxReaderAdapter) FetchPending(ctx context.Context, limit int) ([]outboxpkg.OutboxEntry, error) {
+// FetchPending implements worker.OutboxReader.
+func (a *OutboxReaderAdapter) FetchPending(ctx context.Context, limit int) ([]worker.OutboxEntry, error) {
 	entries, err := a.repo.FetchPending(ctx, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to outbox package type
-	result := make([]outboxpkg.OutboxEntry, len(entries))
+	// Convert to worker package type
+	result := make([]worker.OutboxEntry, len(entries))
 	for i, e := range entries {
-		result[i] = outboxpkg.OutboxEntry{
+		result[i] = worker.OutboxEntry{
 			OutboxID:   e.OutboxID,
 			Payload:    e.Payload,
 			RetryCount: e.RetryCount,
@@ -159,12 +159,15 @@ func (a *OutboxReaderAdapter) FetchPending(ctx context.Context, limit int) ([]ou
 	return result, nil
 }
 
-// Delete implements outbox.OutboxReader.
+// Delete implements worker.OutboxReader.
 func (a *OutboxReaderAdapter) Delete(ctx context.Context, outboxID string) error {
 	return a.repo.Delete(ctx, outboxID)
 }
 
-// IncrementRetry implements outbox.OutboxReader.
+// IncrementRetry implements worker.OutboxReader.
 func (a *OutboxReaderAdapter) IncrementRetry(ctx context.Context, outboxID string) error {
 	return a.repo.IncrementRetry(ctx, outboxID)
 }
+
+// Ensure OutboxReaderAdapter implements worker.OutboxReader
+var _ worker.OutboxReader = (*OutboxReaderAdapter)(nil)
