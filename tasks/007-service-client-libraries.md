@@ -215,8 +215,33 @@ func (s *PostgresStore) ListProjections(...) ([]Projection, int, error) { ... }
 |------|--------|
 | `internal/services/outbox/` | Moved to `internal/services/ingestion/worker/` |
 
+## Documentation Updates
+
+Update documentation to reflect the new architecture. High-level diagrams should emphasize the 3-service view (Ingestion, EventHandler, Query) and hide infrastructure details.
+
+### platform-services
+
+| Document | Updates |
+|----------|---------|
+| `ARCHITECTURE.md` | Update layer mapping, dependency rules, import verification examples |
+| `DEVELOPMENT.md` | Update project structure to show `ingestion/worker/`, `client/`, `shared/projections/` |
+
+### platform-docs
+
+| Document | Updates |
+|----------|---------|
+| `design-spec.md` | Simplify data flow diagrams to show service-level view; move infrastructure details to implementation notes |
+| `README.md` | Update if directory structure is referenced |
+
+### Key Documentation Principles
+
+1. **Top-level diagrams** show 3 services: Ingestion → EventHandler → Query
+2. **Infrastructure details** (outbox, Redpanda, projections table) are implementation notes, not primary diagrams
+3. **Client libraries** are documented as the interface between services
+
 ## Acceptance Criteria
 
+### Code Changes
 - [ ] Outbox processor moved to `internal/services/ingestion/worker/`
 - [ ] `client/eventhandler` package created with `SubmitEvent()`
 - [ ] `shared/projections` package created with `Store` interface
@@ -225,6 +250,12 @@ func (s *PostgresStore) ListProjections(...) ([]Projection, int, error) { ... }
 - [ ] Ingestion Worker uses `EventSubmitter` interface (satisfied by eventhandler client)
 - [ ] All existing tests pass
 - [ ] E2E tests pass
+
+### Documentation Updates
+- [ ] `ARCHITECTURE.md` updated to reflect new structure
+- [ ] `DEVELOPMENT.md` project structure updated
+- [ ] `design-spec.md` diagrams simplified to service-level view
+- [ ] All documentation consistent with 3-service architecture (Ingestion, EventHandler, Query)
 
 ## Component Testing Enabled
 
