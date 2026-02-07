@@ -75,4 +75,4 @@ Open questions, alternatives considered, etc.
 | [004](004-structured-logging.md) | Complete | Configurable Log Level and Format |
 | [005](005-query-service.md) | Complete | Query Service |
 | [006](006-automated-e2e-tests.md) | Complete | Automated End-to-End Tests |
-| [007](007-service-client-libraries.md) | In Progress | Service Client Libraries |
+| [007](007-service-client-libraries.md) | Complete | Service Client Libraries |
