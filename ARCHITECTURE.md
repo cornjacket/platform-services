@@ -1,6 +1,6 @@
 # Platform Services - Architecture
 
-**Last Audited:** 2026-02-06
+**Last Audited:** 2026-02-07
 
 This document describes how the codebase aligns with Clean Architecture / Hexagonal (Ports and Adapters) principles.
 
@@ -132,6 +132,44 @@ Domain entities must be free of infrastructure coupling:
 | No HTTP framework bindings | ✅ |
 | No infrastructure imports | ✅ |
 | Only stdlib + domain deps | ✅ |
+
+## Component Testing
+
+The client library and shared abstraction patterns enable component testing by providing clean injection points. Each service can be tested in isolation by mocking its dependencies.
+
+### Mocking Strategy by Service
+
+| Service | Interface to Mock | Test Scenarios |
+|---------|-------------------|----------------|
+| **Ingestion Worker** | `EventSubmitter` | Verify outbox processing calls `SubmitEvent()` correctly |
+| **EventHandler** | `projections.Store` | Verify event handlers call `WriteProjection()` with correct state |
+| **Query Service** | `ProjectionReader` | Verify `GetProjection()`/`ListProjections()` return expected data |
+
+### Example: Testing Ingestion Worker
+
+```go
+// Mock the EventSubmitter interface
+type mockSubmitter struct {
+    submitted []*events.Envelope
+}
+
+func (m *mockSubmitter) SubmitEvent(ctx context.Context, e *events.Envelope) error {
+    m.submitted = append(m.submitted, e)
+    return nil
+}
+
+func TestProcessor_ProcessesOutboxEntry(t *testing.T) {
+    mock := &mockSubmitter{}
+    processor := worker.NewProcessor(outboxReader, eventStore, mock, logger)
+
+    // ... trigger processing ...
+
+    assert.Len(t, mock.submitted, 1)
+    assert.Equal(t, "sensor.reading", mock.submitted[0].EventType)
+}
+```
+
+This follows the **Dependency Inversion Principle** — high-level services depend on abstractions (interfaces), not concrete implementations. Infrastructure details (Redpanda, Postgres) are hidden behind interfaces that can be swapped for mocks in tests.
 
 ## Known Architectural Smells
 
