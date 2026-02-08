@@ -1,0 +1,30 @@
+# Binaries
+/platform
+/bin/
+
+# Test artifacts (generated, not checked in)
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Vendor (use go modules)
+/vendor/
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.prof
