@@ -48,7 +48,7 @@ func (s *PostgresStore) WriteProjection(ctx context.Context, projType, aggregate
 		aggregateID,
 		state,
 		event.EventID,
-		event.Timestamp,
+		event.EventTime,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to write projection: %w", err)

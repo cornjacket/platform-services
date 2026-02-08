@@ -39,7 +39,7 @@ func (r *OutboxRepo) Insert(ctx context.Context, event *events.Envelope) error {
 		VALUES ($1, $2, $3)
 	`
 
-	_, err = r.pool.Exec(ctx, query, event.EventID, payload, event.Timestamp)
+	_, err = r.pool.Exec(ctx, query, event.EventID, payload, event.IngestedAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert into outbox: %w", err)
 	}

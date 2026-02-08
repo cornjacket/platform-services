@@ -19,6 +19,8 @@ platform-services/
 │   │   ├── config/
 │   │   │   └── config.go            # Env vars, feature flags
 │   │   ├── domain/
+│   │   │   ├── clock/               # Time abstraction for testability
+│   │   │   │   └── clock.go         # RealClock, FixedClock, ReplayClock
 │   │   │   ├── events/              # Event types and envelope
 │   │   │   │   └── envelope.go
 │   │   │   └── models/              # Domain models

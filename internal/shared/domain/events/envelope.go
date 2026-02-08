@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/cornjacket/platform-services/internal/shared/domain/clock"
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -19,8 +20,11 @@ type Envelope struct {
 	// AggregateID groups related events (e.g., device ID, session ID)
 	AggregateID string `json:"aggregate_id"`
 
-	// Timestamp is when the event occurred
-	Timestamp time.Time `json:"timestamp"`
+	// EventTime is when the event occurred (from the caller/producer)
+	EventTime time.Time `json:"event_time"`
+
+	// IngestedAt is when the platform received the event (set by platform clock)
+	IngestedAt time.Time `json:"ingested_at"`
 
 	// Payload contains the event-specific data
 	Payload json.RawMessage `json:"payload"`
@@ -41,8 +45,10 @@ type Metadata struct {
 	SchemaVersion int `json:"schema_version"`
 }
 
-// NewEnvelope creates a new event envelope with a generated ID and current timestamp.
-func NewEnvelope(eventType, aggregateID string, payload any, metadata Metadata) (*Envelope, error) {
+// NewEnvelope creates a new event envelope.
+// eventTime is provided by the caller (when the event occurred).
+// IngestedAt is set automatically by the platform clock.
+func NewEnvelope(eventType, aggregateID string, payload any, metadata Metadata, eventTime time.Time) (*Envelope, error) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -52,7 +58,8 @@ func NewEnvelope(eventType, aggregateID string, payload any, metadata Metadata) 
 		EventID:     uuid.Must(uuid.NewV7()),
 		EventType:   eventType,
 		AggregateID: aggregateID,
-		Timestamp:   time.Now().UTC(),
+		EventTime:   eventTime,
+		IngestedAt:  clock.Now(),
 		Payload:     payloadBytes,
 		Metadata:    metadata,
 	}, nil

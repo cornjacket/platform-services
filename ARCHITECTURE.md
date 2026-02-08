@@ -10,7 +10,7 @@ For the directory structure, see [DEVELOPMENT.md](DEVELOPMENT.md#project-structu
 
 | Clean Architecture Layer | Location | Example |
 |--------------------------|----------|---------|
-| **Entities (Domain)** | `internal/shared/domain/` | `events/envelope.go` |
+| **Entities (Domain)** | `internal/shared/domain/` | `events/envelope.go`, `clock/clock.go` |
 | **Shared Domain** | `internal/shared/projections/` | `store.go`, `postgres.go` |
 | **Use Cases (Application)** | `internal/services/*/service.go` | `ingestion/service.go` |
 | **Ports (Interfaces)** | `internal/services/*/repository.go` | `ingestion/repository.go` |

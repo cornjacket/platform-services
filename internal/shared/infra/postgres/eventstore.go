@@ -28,15 +28,16 @@ func NewEventStoreRepo(pool *pgxpool.Pool, logger *slog.Logger) *EventStoreRepo 
 // Returns an error if the event_id already exists (unique constraint).
 func (r *EventStoreRepo) Insert(ctx context.Context, event *events.Envelope) error {
 	query := `
-		INSERT INTO event_store (event_id, event_type, aggregate_id, timestamp, payload, metadata)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO event_store (event_id, event_type, aggregate_id, event_time, ingested_at, payload, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err := r.pool.Exec(ctx, query,
 		event.EventID,
 		event.EventType,
 		event.AggregateID,
-		event.Timestamp,
+		event.EventTime,
+		event.IngestedAt,
 		event.Payload,
 		event.Metadata,
 	)

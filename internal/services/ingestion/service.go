@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
+	"github.com/cornjacket/platform-services/internal/shared/domain/clock"
 	"github.com/cornjacket/platform-services/internal/shared/domain/events"
 )
 
@@ -28,6 +30,7 @@ type IngestRequest struct {
 	EventType   string          `json:"event_type"`
 	AggregateID string          `json:"aggregate_id"`
 	Payload     json.RawMessage `json:"payload"`
+	EventTime   *time.Time      `json:"event_time,omitempty"` // optional, defaults to clock.Now()
 	TraceID     string          `json:"trace_id,omitempty"`
 }
 
@@ -44,6 +47,12 @@ func (s *Service) Ingest(ctx context.Context, req *IngestRequest) (*IngestRespon
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
+	// Determine event time: use provided time or default to clock.Now()
+	eventTime := clock.Now()
+	if req.EventTime != nil {
+		eventTime = *req.EventTime
+	}
+
 	// Create event envelope
 	envelope, err := events.NewEnvelope(
 		req.EventType,
@@ -54,6 +63,7 @@ func (s *Service) Ingest(ctx context.Context, req *IngestRequest) (*IngestRespon
 			Source:        "ingestion-api",
 			SchemaVersion: 1,
 		},
+		eventTime,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event envelope: %w", err)

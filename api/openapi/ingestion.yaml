@@ -109,6 +109,14 @@ components:
           type: object
           description: Event-specific data (must be valid JSON)
           additionalProperties: true
+        event_time:
+          type: string
+          format: date-time
+          description: |
+            When the event occurred (ISO 8601 format). Optional.
+            If omitted, the platform uses the current time.
+            Use this for IoT devices that buffer events during network outages.
+          example: "2026-02-07T10:00:00Z"
         trace_id:
           type: string
           description: Optional trace ID for distributed tracing
