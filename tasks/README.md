@@ -76,3 +76,4 @@ Open questions, alternatives considered, etc.
 | [005](005-query-service.md) | Complete | Query Service |
 | [006](006-automated-e2e-tests.md) | Complete | Automated End-to-End Tests |
 | [007](007-service-client-libraries.md) | Complete | Service Client Libraries |
+| [008](008-time-handling-strategy.md) | Draft | Time Handling Strategy (clock injection, dual timestamps) |
