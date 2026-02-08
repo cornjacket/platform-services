@@ -248,7 +248,7 @@ If `event_time` is omitted, the platform uses `clock.Now()` as a fallback.
 
 ### Documentation Updates
 
-- [ ] **ADR-0015: Time Handling Strategy** — Document the architectural decision for dual timestamps and clock injection
+- [x] **ADR-0015: Time Handling Strategy** — Document the architectural decision for dual timestamps and clock injection
 - [ ] **design-spec.md** — Add section on time handling (event time vs ingestion time, clock abstraction)
 - [x] **ARCHITECTURE.md** — Add `clock` package to layer mapping (Domain layer)
 - [x] **DEVELOPMENT.md** — Update project structure to show `clock/` package
@@ -278,7 +278,7 @@ If `event_time` is omitted, the platform uses `clock.Now()` as a fallback.
 - [x] API accepts optional `event_time` field
 - [x] Database schema updated with migration
 - [x] All existing E2E tests pass
-- [ ] ADR-0015 documents the decision
+- [x] ADR-0015 documents the decision
 - [x] Documentation updated (ARCHITECTURE.md, DEVELOPMENT.md, OpenAPI)
 
 ## Notes
