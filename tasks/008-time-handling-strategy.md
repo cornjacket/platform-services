@@ -1,8 +1,9 @@
 # Task 008: Time Handling Strategy
 
-**Status:** Draft
+**Status:** Complete
 **Created:** 2026-02-07
 **Updated:** 2026-02-07
+**Completed:** 2026-02-07
 
 ## Context
 
@@ -249,36 +250,36 @@ If `event_time` is omitted, the platform uses `clock.Now()` as a fallback.
 
 - [ ] **ADR-0015: Time Handling Strategy** — Document the architectural decision for dual timestamps and clock injection
 - [ ] **design-spec.md** — Add section on time handling (event time vs ingestion time, clock abstraction)
-- [ ] **ARCHITECTURE.md** — Add `clock` package to layer mapping (Domain layer)
-- [ ] **DEVELOPMENT.md** — Update project structure to show `clock/` package
-- [ ] **OpenAPI spec** — Document `event_time` field in ingestion request
+- [x] **ARCHITECTURE.md** — Add `clock` package to layer mapping (Domain layer)
+- [x] **DEVELOPMENT.md** — Update project structure to show `clock/` package
+- [x] **OpenAPI spec** — Document `event_time` field in ingestion request
 
 ### Implementation
 
-- [ ] Create `clock` package with `RealClock`, `FixedClock`, `ReplayClock`
-- [ ] Update `Envelope` struct with dual timestamps
-- [ ] Update `NewEnvelope()` signature
-- [ ] Update all callers of `NewEnvelope()`
-- [ ] Update ingestion handler to parse `event_time`
-- [ ] Create database migration for schema change
-- [ ] Update existing tests
+- [x] Create `clock` package with `RealClock`, `FixedClock`, `ReplayClock`
+- [x] Update `Envelope` struct with dual timestamps
+- [x] Update `NewEnvelope()` signature
+- [x] Update all callers of `NewEnvelope()`
+- [x] Update ingestion service to parse `event_time`
+- [x] Create database migration for schema change
+- [x] Update postgres adapters (outbox, eventstore, projections)
 
 ### Testing
 
-- [ ] Unit test `clock` package
-- [ ] Unit test `NewEnvelope()` with fixed clock
-- [ ] Verify E2E tests pass with new schema
+- [x] Unit test `clock` package
+- [x] Unit test `NewEnvelope()` with fixed clock
+- [x] Verify E2E tests pass with new schema
 
 ## Acceptance Criteria
 
-- [ ] `clock.Now()` is used instead of `time.Now()` throughout codebase
-- [ ] `Envelope` has both `EventTime` and `IngestedAt` fields
-- [ ] Unit tests can assert exact timestamps
-- [ ] API accepts optional `event_time` field
-- [ ] Database schema updated with migration
-- [ ] All existing E2E tests pass
+- [x] `clock.Now()` is used instead of `time.Now()` throughout codebase
+- [x] `Envelope` has both `EventTime` and `IngestedAt` fields
+- [x] Unit tests can assert exact timestamps
+- [x] API accepts optional `event_time` field
+- [x] Database schema updated with migration
+- [x] All existing E2E tests pass
 - [ ] ADR-0015 documents the decision
-- [ ] Documentation updated
+- [x] Documentation updated (ARCHITECTURE.md, DEVELOPMENT.md, OpenAPI)
 
 ## Notes
 
