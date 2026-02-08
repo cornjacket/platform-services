@@ -249,7 +249,7 @@ If `event_time` is omitted, the platform uses `clock.Now()` as a fallback.
 ### Documentation Updates
 
 - [x] **ADR-0015: Time Handling Strategy** — Document the architectural decision for dual timestamps and clock injection
-- [ ] **design-spec.md** — Add section on time handling (event time vs ingestion time, clock abstraction)
+- [x] **design-spec.md** — Add section on time handling (event time vs ingestion time, clock abstraction)
 - [x] **ARCHITECTURE.md** — Add `clock` package to layer mapping (Domain layer)
 - [x] **DEVELOPMENT.md** — Update project structure to show `clock/` package
 - [x] **OpenAPI spec** — Document `event_time` field in ingestion request
