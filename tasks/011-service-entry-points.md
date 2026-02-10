@@ -21,8 +21,8 @@ Introduce a `Service()` function in each service package that encapsulates all i
 
 Each `Service()` function:
 - Takes a service-specific config struct
-- Takes a `*pgxpool.Pool` as a concrete dependency (the DB resource)
-- Takes other dependencies as interfaces (for testability)
+- Takes a `*pgxpool.Pool` as a concrete dependency where the service owns its DB wiring internally
+- Takes service outputs as interfaces (for testability and component testing)
 - Takes a logger
 - Owns all internal wiring: creating repos, services, handlers, routes, servers
 - Returns a `Shutdown()` function or similar mechanism for graceful teardown
@@ -36,7 +36,7 @@ Each service gets a new entry point file:
 | File | Function |
 |------|----------|
 | `internal/services/ingestion/ingestion.go` | `func Service(cfg Config, pool *pgxpool.Pool, submitter EventSubmitter, logger *slog.Logger) (*RunningService, error)` |
-| `internal/services/eventhandler/eventhandler.go` | `func Service(cfg Config, pool *pgxpool.Pool, logger *slog.Logger) (*RunningService, error)` |
+| `internal/services/eventhandler/eventhandler.go` | `func Service(cfg Config, writer ProjectionWriter, logger *slog.Logger) (*RunningService, error)` |
 | `internal/services/query/query.go` | `func Service(cfg Config, pool *pgxpool.Pool, logger *slog.Logger) (*RunningService, error)` |
 
 ### Service Function Signatures
@@ -90,19 +90,24 @@ type Config struct {
     PollTimeout   time.Duration
 }
 
+// ProjectionWriter is the service's output dependency — writes projections for downstream consumers.
+// Satisfied by projections.PostgresStore in production, mockable in component tests.
+// Already defined in repository.go; reused here, not duplicated.
+
 type RunningService struct {
     Shutdown func(ctx context.Context) error
 }
 
-func Service(ctx context.Context, cfg Config, pool *pgxpool.Pool, logger *slog.Logger) (*RunningService, error)
+func Service(ctx context.Context, cfg Config, writer ProjectionWriter, logger *slog.Logger) (*RunningService, error)
 ```
 
 Internally, `Service()` creates:
-- `projections.PostgresStore` from `pool`
-- `HandlerRegistry` with `SensorHandler` and `UserHandler`
+- `HandlerRegistry` with `SensorHandler` and `UserHandler` (using injected `writer`)
 - `Consumer` with config
 - Starts consumer in goroutine
 - Returns `RunningService` with a `Shutdown` that closes the consumer
+
+Note: EventHandler does not take a `*pgxpool.Pool`. The pool was only used to create `PostgresStore`, which is now injected as `ProjectionWriter`. `main.go` creates the store from the pool and passes it in.
 
 **Query** — HTTP server, read-only.
 
@@ -132,14 +137,18 @@ Each `Service()` function takes external dependencies as interfaces:
 
 | Service | Concrete DB | Interface Dependencies | Why Interface |
 |---------|-------------|----------------------|---------------|
-| Ingestion | `*pgxpool.Pool` | `EventSubmitter` | Redpanda producer is external; mockable for component tests |
-| EventHandler | `*pgxpool.Pool` | (none) | Consumer is internal to the service; broker config is in `Config` |
-| Query | `*pgxpool.Pool` | (none) | Read-only; projections store is created from pool internally |
+| Ingestion | `*pgxpool.Pool` | `EventSubmitter` | Service output — publishes events to Redpanda for EventHandler. Mockable to verify what was published. |
+| EventHandler | (none) | `ProjectionWriter` | Service output — writes projections consumed by Query. Mockable to verify what was written. |
+| Query | `*pgxpool.Pool` | (none) | Service output is HTTP responses to external clients — no downstream service to mock. |
 
-The DB pool is concrete because:
+**The rule: inject outputs, not inputs.** Service inputs (HTTP requests, Redpanda messages) arrive via infrastructure that the service configures internally. Service outputs cross to the next service in the pipeline and must be injectable for component testing.
+
+The DB pool is concrete where used (Ingestion, Query) because:
 - It's a resource, not a behavior — you don't mock a connection pool
 - Services create their own repos from the pool (the repos are the abstraction layer)
 - Per ADR-0010, each service gets its own pool in production
+
+EventHandler doesn't take a pool because its only DB interaction (projection writes) is its output — already covered by the `ProjectionWriter` interface.
 
 ### RunningService Pattern
 
@@ -148,7 +157,7 @@ All three `Service()` functions return `*RunningService` with a `Shutdown` metho
 ```go
 ingestion, err := ingestion.Service(ctx, ingestionCfg, ingestionPool, submitter, logger)
 // ...
-eventHandler, err := eventhandler.Service(ctx, ehCfg, ehPool, logger)
+eventHandler, err := eventhandler.Service(ctx, ehCfg, projectionsStore, logger)
 // ...
 querySvc, err := query.Service(ctx, queryCfg, queryPool, logger)
 // ...
@@ -165,9 +174,9 @@ After refactoring, `cmd/platform/main.go` handles only:
 
 1. Load global config (`config.Load()`)
 2. Create logger
-3. Create DB pools (one per service)
-4. Create shared external resources (Redpanda producer → `eventhandler.Client`)
-5. Call each `Service()` function
+3. Create DB pools (Ingestion, EventHandler, Query)
+4. Create shared external resources (Redpanda producer → `eventhandler.Client`, `projections.PostgresStore` from EventHandler pool)
+5. Call each `Service()` function, passing pools and output interfaces
 6. Wait for OS signal
 7. Call `Shutdown()` on each service
 
@@ -175,7 +184,7 @@ All service-internal wiring (repos, handlers, routes, servers) moves into the re
 
 ### Existing Interfaces Stay Unchanged
 
-The interfaces defined in each service's `repository.go` (`OutboxRepository`, `OutboxReader`, `EventStoreWriter`, `ProjectionWriter`, `ProjectionReader`, `EventHandler`, `EventConsumer`) are not modified. They continue to serve as the internal dependency boundaries within each service. The new `Service()` functions create the concrete implementations and wire them together.
+The interfaces defined in each service's `repository.go` (`OutboxRepository`, `OutboxReader`, `EventStoreWriter`, `ProjectionWriter`, `ProjectionReader`, `EventHandler`, `EventConsumer`) are not modified. `ProjectionWriter` (already defined in `eventhandler/repository.go`) is promoted from an internal dependency to the `Service()` function signature — it becomes the output interface. No new interface definitions are needed.
 
 ### Config Struct Relationship
 
@@ -229,14 +238,15 @@ This avoids coupling service packages to the global config struct.
 - [ ] `internal/services/ingestion/ingestion.go` defines `Config`, `RunningService`, and `func Service()`
 - [ ] `internal/services/eventhandler/eventhandler.go` defines `Config`, `RunningService`, and `func Service()`
 - [ ] `internal/services/query/query.go` defines `Config`, `RunningService`, and `func Service()`
-- [ ] Each `Service()` takes `*pgxpool.Pool` as concrete input, non-DB dependencies as interfaces
+- [ ] Ingestion and Query `Service()` take `*pgxpool.Pool` as concrete input; EventHandler takes `ProjectionWriter` interface instead
+- [ ] Service outputs are injected as interfaces: `EventSubmitter` for Ingestion, `ProjectionWriter` for EventHandler
 - [ ] Each `Service()` returns `*RunningService` with `Shutdown` method
 - [ ] `cmd/platform/main.go` uses `Service()` calls instead of inline wiring
-- [ ] `cmd/platform/main.go` has no direct imports of infrastructure packages (`postgres`, `redpanda`, `projections`) except for pool creation and the Redpanda producer
+- [ ] `cmd/platform/main.go` creates infrastructure (pools, producer, projections store) and passes them to services
 - [ ] `go test ./...` passes (unit tests)
 - [ ] `go test -tags=integration ./...` passes (integration tests)
 - [ ] `make dev` starts the platform successfully
-- [ ] Existing `EventSubmitter` interface in `worker/repository.go` is reused (not duplicated) by the ingestion `Service()` function
+- [ ] Existing `ProjectionWriter` interface in `eventhandler/repository.go` is used directly by EventHandler's `Service()` function (not duplicated)
 
 ## Notes
 
@@ -253,12 +263,18 @@ The ingestion worker needs a dedicated `pgx.Conn` for PostgreSQL LISTEN (not fro
 After this refactoring, a component test can call:
 
 ```go
+// Ingestion: real DB, mock output
 svc, err := ingestion.Service(ctx, testCfg, testPool, mockSubmitter, testLogger)
-// ... exercise HTTP endpoints ...
+// ... POST events via HTTP, assert mockSubmitter received them ...
+svc.Shutdown(ctx)
+
+// EventHandler: mock output, real Redpanda input
+svc, err := eventhandler.Service(ctx, testCfg, mockWriter, testLogger)
+// ... produce events to Redpanda, assert mockWriter received projection writes ...
 svc.Shutdown(ctx)
 ```
 
-This starts a real HTTP server with a real database but a mock event submitter — the definition of a component test.
+Each service can be tested in isolation by mocking its output while keeping its input infrastructure real.
 
 ### Actions and TSDB deferred
 
