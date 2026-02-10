@@ -4,19 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
 	ehclient "github.com/cornjacket/platform-services/internal/client/eventhandler"
 	"github.com/cornjacket/platform-services/internal/services/eventhandler"
 	"github.com/cornjacket/platform-services/internal/services/ingestion"
-	"github.com/cornjacket/platform-services/internal/services/ingestion/worker"
 	"github.com/cornjacket/platform-services/internal/services/query"
 	"github.com/cornjacket/platform-services/internal/shared/config"
 	"github.com/cornjacket/platform-services/internal/shared/infra/postgres"
@@ -25,76 +21,48 @@ import (
 )
 
 func main() {
-	// Load configuration first (errors go to stderr)
+	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize structured logger from config
+	// Initialize logger
 	logger := newLogger(cfg.LogLevel, cfg.LogFormat)
 	slog.SetDefault(logger)
 
 	slog.Info("starting platform services",
 		"ingestion_port", cfg.PortIngestion,
 		"query_port", cfg.PortQuery,
-		"actions_port", cfg.PortActions,
 	)
 
-	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize PostgreSQL client for Ingestion service
+	// Create DB pools (one per service, per ADR-0010)
 	ingestionPG, err := postgres.NewClient(ctx, cfg.DatabaseURLIngestion, logger)
 	if err != nil {
-		slog.Error("failed to connect to PostgreSQL", "error", err)
+		slog.Error("failed to connect to PostgreSQL (ingestion)", "error", err)
 		os.Exit(1)
 	}
 	defer ingestionPG.Close()
 
-	// Initialize repositories
-	outboxRepo := postgres.NewOutboxRepo(ingestionPG.Pool(), logger)
-
-	// Initialize ingestion service
-	ingestionService := ingestion.NewService(outboxRepo, logger)
-	ingestionHandler := ingestion.NewHandler(ingestionService, logger)
-
-	// Set up HTTP server for ingestion
-	ingestionMux := http.NewServeMux()
-	ingestionHandler.RegisterRoutes(ingestionMux)
-
-	ingestionServer := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.PortIngestion),
-		Handler:      ingestionMux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	// Start ingestion server in goroutine
-	go func() {
-		slog.Info("starting ingestion server", "port", cfg.PortIngestion)
-		if err := ingestionServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("ingestion server error", "error", err)
-			cancel()
-		}
-	}()
-
-	// Initialize Ingestion Worker (formerly Outbox Processor)
-	// Create dedicated LISTEN connection (not from pool)
-	listenConn, err := pgx.Connect(ctx, cfg.DatabaseURLIngestion)
+	eventHandlerPG, err := postgres.NewClient(ctx, cfg.DatabaseURLEventHandler, logger)
 	if err != nil {
-		slog.Error("failed to create LISTEN connection", "error", err)
+		slog.Error("failed to connect to PostgreSQL (event handler)", "error", err)
 		os.Exit(1)
 	}
-	defer listenConn.Close(context.Background())
+	defer eventHandlerPG.Close()
 
-	// Create event store repository
-	eventStoreRepo := postgres.NewEventStoreRepo(ingestionPG.Pool(), logger)
+	queryPG, err := postgres.NewClient(ctx, cfg.DatabaseURLQuery, logger)
+	if err != nil {
+		slog.Error("failed to connect to PostgreSQL (query)", "error", err)
+		os.Exit(1)
+	}
+	defer queryPG.Close()
 
-	// Create Redpanda producer
+	// Create shared external resources
 	brokers := strings.Split(cfg.RedpandaBrokers, ",")
 	redpandaProducer, err := redpanda.NewProducer(brokers, logger)
 	if err != nil {
@@ -103,111 +71,42 @@ func main() {
 	}
 	defer redpandaProducer.Close()
 
-	// Create EventHandler client (wraps Redpanda producer)
-	eventHandlerClient := ehclient.New(redpandaProducer, logger)
-
-	// Create ingestion worker processor
-	ingestionWorker := worker.NewProcessor(
-		postgres.NewOutboxReaderAdapter(ingestionPG.Pool(), logger),
-		eventStoreRepo,
-		eventHandlerClient,
-		listenConn,
-		worker.ProcessorConfig{
-			WorkerCount:  cfg.OutboxWorkerCount,
-			BatchSize:    cfg.OutboxBatchSize,
-			MaxRetries:   cfg.OutboxMaxRetries,
-			PollInterval: cfg.OutboxPollInterval,
-		},
-		logger,
-	)
-
-	// Start ingestion worker in goroutine
-	go func() {
-		if err := ingestionWorker.Start(ctx); err != nil {
-			slog.Error("ingestion worker error", "error", err)
-			cancel()
-		}
-	}()
-
-	// Initialize Event Handler
-	// Create PostgreSQL client for Event Handler service
-	eventHandlerPG, err := postgres.NewClient(ctx, cfg.DatabaseURLEventHandler, logger)
-	if err != nil {
-		slog.Error("failed to connect to PostgreSQL for event handler", "error", err)
-		os.Exit(1)
-	}
-	defer eventHandlerPG.Close()
-
-	// Create shared projections store
+	eventSubmitter := ehclient.New(redpandaProducer, logger)
 	projectionsStore := projections.NewPostgresStore(eventHandlerPG.Pool(), logger)
 
-	// Create handler registry and register handlers
-	handlerRegistry := eventhandler.NewHandlerRegistry(logger)
-	handlerRegistry.Register("sensor.", eventhandler.NewSensorHandler(projectionsStore, logger))
-	handlerRegistry.Register("user.", eventhandler.NewUserHandler(projectionsStore, logger))
-
-	// Create event consumer
-	topics := strings.Split(cfg.EventHandlerTopics, ",")
-	eventConsumer, err := eventhandler.NewConsumer(
-		handlerRegistry,
-		eventhandler.ConsumerConfig{
-			Brokers:     brokers,
-			GroupID:     cfg.EventHandlerConsumerGroup,
-			Topics:      topics,
-			PollTimeout: cfg.EventHandlerPollTimeout,
-		},
-		logger,
-	)
+	// Start services
+	ingestionSvc, err := ingestion.Start(ctx, ingestion.Config{
+		Port:         cfg.PortIngestion,
+		WorkerCount:  cfg.OutboxWorkerCount,
+		BatchSize:    cfg.OutboxBatchSize,
+		MaxRetries:   cfg.OutboxMaxRetries,
+		PollInterval: cfg.OutboxPollInterval,
+		DatabaseURL:  cfg.DatabaseURLIngestion,
+	}, ingestionPG.Pool(), eventSubmitter, logger)
 	if err != nil {
-		slog.Error("failed to create event consumer", "error", err)
+		slog.Error("failed to start ingestion service", "error", err)
 		os.Exit(1)
 	}
-	defer eventConsumer.Close()
 
-	// Start event consumer in goroutine
-	go func() {
-		if err := eventConsumer.Start(ctx); err != nil {
-			slog.Error("event consumer error", "error", err)
-			cancel()
-		}
-	}()
-
-	// Initialize Query Service
-	// Create PostgreSQL client for Query service (reads from Event Handler's database)
-	queryPG, err := postgres.NewClient(ctx, cfg.DatabaseURLQuery, logger)
+	ehTopics := strings.Split(cfg.EventHandlerTopics, ",")
+	eventHandlerSvc, err := eventhandler.Start(ctx, eventhandler.Config{
+		Brokers:       brokers,
+		ConsumerGroup: cfg.EventHandlerConsumerGroup,
+		Topics:        ehTopics,
+		PollTimeout:   cfg.EventHandlerPollTimeout,
+	}, projectionsStore, logger)
 	if err != nil {
-		slog.Error("failed to connect to PostgreSQL for query service", "error", err)
+		slog.Error("failed to start event handler service", "error", err)
 		os.Exit(1)
 	}
-	defer queryPG.Close()
 
-	// Create query projections store and service
-	queryProjectionsStore := projections.NewPostgresStore(queryPG.Pool(), logger)
-	queryService := query.NewService(queryProjectionsStore, logger)
-	queryHandler := query.NewHandler(queryService, logger)
-
-	// Set up HTTP server for query
-	queryMux := http.NewServeMux()
-	queryHandler.RegisterRoutes(queryMux)
-
-	queryServer := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.PortQuery),
-		Handler:      queryMux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	querySvc, err := query.Start(ctx, query.Config{
+		Port: cfg.PortQuery,
+	}, queryPG.Pool(), logger)
+	if err != nil {
+		slog.Error("failed to start query service", "error", err)
+		os.Exit(1)
 	}
-
-	// Start query server in goroutine
-	go func() {
-		slog.Info("starting query server", "port", cfg.PortQuery)
-		if err := queryServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("query server error", "error", err)
-			cancel()
-		}
-	}()
-
-	// TODO: Initialize and start Actions service
 
 	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
@@ -220,18 +119,19 @@ func main() {
 		slog.Info("context cancelled")
 	}
 
-	// Graceful shutdown
-	slog.Info("shutting down servers...")
-
+	// Graceful shutdown (reverse order)
+	slog.Info("shutting down services...")
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
-	if err := ingestionServer.Shutdown(shutdownCtx); err != nil {
-		slog.Error("ingestion server shutdown error", "error", err)
+	if err := querySvc.Shutdown(shutdownCtx); err != nil {
+		slog.Error("query service shutdown error", "error", err)
 	}
-
-	if err := queryServer.Shutdown(shutdownCtx); err != nil {
-		slog.Error("query server shutdown error", "error", err)
+	if err := eventHandlerSvc.Shutdown(shutdownCtx); err != nil {
+		slog.Error("event handler service shutdown error", "error", err)
+	}
+	if err := ingestionSvc.Shutdown(shutdownCtx); err != nil {
+		slog.Error("ingestion service shutdown error", "error", err)
 	}
 
 	slog.Info("platform services stopped")

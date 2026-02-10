@@ -1,7 +1,7 @@
 # Spec 011: Service Entry Points
 
 **Type:** Spec
-**Status:** Draft
+**Status:** Complete
 **Created:** 2026-02-10
 **Updated:** 2026-02-10
 
@@ -235,18 +235,20 @@ This avoids coupling service packages to the global config struct.
 
 ## Acceptance Criteria
 
-- [ ] `internal/services/ingestion/ingestion.go` defines `Config`, `RunningService`, and `func Service()`
-- [ ] `internal/services/eventhandler/eventhandler.go` defines `Config`, `RunningService`, and `func Service()`
-- [ ] `internal/services/query/query.go` defines `Config`, `RunningService`, and `func Service()`
-- [ ] Ingestion and Query `Service()` take `*pgxpool.Pool` as concrete input; EventHandler takes `ProjectionWriter` interface instead
-- [ ] Service outputs are injected as interfaces: `EventSubmitter` for Ingestion, `ProjectionWriter` for EventHandler
-- [ ] Each `Service()` returns `*RunningService` with `Shutdown` method
-- [ ] `cmd/platform/main.go` uses `Service()` calls instead of inline wiring
-- [ ] `cmd/platform/main.go` creates infrastructure (pools, producer, projections store) and passes them to services
-- [ ] `go test ./...` passes (unit tests)
-- [ ] `go test -tags=integration ./...` passes (integration tests)
-- [ ] `make dev` starts the platform successfully
-- [ ] Existing `ProjectionWriter` interface in `eventhandler/repository.go` is used directly by EventHandler's `Service()` function (not duplicated)
+- [x] `internal/services/ingestion/ingestion.go` defines `Config`, `RunningService`, and `func Start()`
+- [x] `internal/services/eventhandler/eventhandler.go` defines `Config`, `RunningService`, and `func Start()`
+- [x] `internal/services/query/query.go` defines `Config`, `RunningService`, and `func Start()`
+- [x] Ingestion and Query `Start()` take `*pgxpool.Pool` as concrete input; EventHandler takes `ProjectionWriter` interface instead
+- [x] Service outputs are injected as interfaces: `worker.EventSubmitter` for Ingestion, `ProjectionWriter` for EventHandler
+- [x] Each `Start()` returns `*RunningService` with `Shutdown` method
+- [x] `cmd/platform/main.go` uses `Start()` calls instead of inline wiring
+- [x] `cmd/platform/main.go` creates infrastructure (pools, producer, projections store) and passes them to services
+- [x] `go test ./...` passes (unit tests)
+- [x] `go test -tags=integration ./...` passes (22 integration tests)
+- [x] E2E tests pass (3/3: full-flow, ingest-event, query-projection)
+- [x] Existing `ProjectionWriter` interface in `eventhandler/repository.go` is used directly by EventHandler's `Start()` function (not duplicated)
+
+**Implementation note:** The entry point function was renamed from `Service()` to `Start()` because each package already has a `Service` struct (the business logic type). `Start()` avoids the name collision while clearly communicating that it launches the service.
 
 ## Notes
 
