@@ -125,3 +125,4 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [008](008-time-handling-strategy.md) | Spec | Complete | Time Handling Strategy (clock injection, dual timestamps) |
 | [009](009-unit-tests.md) | Spec | Complete | Unit Tests (Phase 1 test baseline) |
 | [010](010-integration-tests.md) | Spec | Complete | Integration Tests (real Postgres/Redpanda via docker-compose) |
+| [011](011-service-entry-points.md) | Spec | Draft | Service Entry Points (Service() wrappers, component testing) |
