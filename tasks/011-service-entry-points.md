@@ -276,6 +276,16 @@ svc.Shutdown(ctx)
 
 Each service can be tested in isolation by mocking its output while keeping its input infrastructure real.
 
+### Follow-up: Update design spec testing section
+
+After implementation, update `platform-docs/design-spec.md` section 15:
+- Add "Component tests" as a fourth tier in the 15.1 strategy table (between integration and E2E)
+- Expand the "Service Component Tests" section to describe the `Service()` entry point pattern
+- Document the "inject outputs, not inputs" principle as the interface boundary rule
+- Show when to use component tests vs. integration vs. E2E
+
+This should be done after Spec 011 is implemented, not before — the design spec should document what exists.
+
 ### Actions and TSDB deferred
 
 The `actions/` and `tsdb/` directories are empty placeholders. Their `Service()` functions will be added when those services are implemented (Phase 2 and Phase 5 respectively).
