@@ -160,6 +160,20 @@ The "every change needs a task doc" rule (Lesson 003) was adopted mid-project. R
 
 See: `ai-builder-lessons/lessons/004-retroactive-documentation-when-adopting-task-doc-rule.md`
 
+### Why hand-written mocks over mock libraries
+
+Mock libraries like `testify/mock` and `gomock` are popular in Go, but they solve a problem this codebase doesn't have.
+
+**The core tradeoff is compile-time vs. runtime safety.** testify/mock uses string-based method dispatch (`mockRepo.On("Insert", mock.Anything).Return(nil)`). A typo in the method name compiles fine and fails at runtime with an opaque error. The function-field pattern catches the same mistake at compile time — there's no `InsertFn` field to misspell without the compiler objecting.
+
+**Go's interface philosophy makes mock libraries unnecessary for small interfaces.** The stdlib averages 1-2 methods per interface (`io.Reader`, `http.Handler`). This codebase follows the same pattern — every interface is 1-3 methods. A hand-written mock for a 1-method interface is 5 lines. A mock library adds a dependency, a learning curve, and a runtime failure mode to avoid writing those 5 lines.
+
+**Mock libraries originated in Java/C# where interfaces are large** (10-20 methods). Mocking a 15-method interface by hand is genuinely painful. But Go's "accept interfaces, return structs" principle means you define narrow interfaces at the consumer, not broad interfaces at the producer. Importing a solution for large interfaces into a codebase with small interfaces is solving a problem that doesn't exist.
+
+**`mock.Anything` undermines static typing.** Once tests use `mock.Anything` to avoid specifying argument types, they've recreated dynamic typing inside a statically-typed language. The function-field pattern gets typed arguments for free because the function signature matches the interface method.
+
+**Re-evaluate if interfaces grow.** If Phase 2 introduces interfaces with 5+ methods (e.g., wrapping a complex third-party SDK), gomock's code generation approach (which preserves compile-time safety unlike testify/mock) would be worth reconsidering. For now, hand-written mocks are the simpler, safer, and more idiomatic choice.
+
 ### Test naming conventions
 
 Following Go conventions:
