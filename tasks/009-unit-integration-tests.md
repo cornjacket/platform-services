@@ -1,15 +1,17 @@
-# Spec 009: Unit and Integration Tests
+# Spec 009: Unit Tests
 
 **Type:** Spec
-**Status:** Draft
+**Status:** Complete
 **Created:** 2026-02-09
 **Updated:** 2026-02-09
 
 ## Context
 
-The Phase 1 (Local Skeleton) checklist in `platform-docs/PROJECT.md` includes "Unit/Integration tests" as a deliverable. The codebase currently has **12 test functions across 5 files**, created as byproducts of other specs or chat-initiated work. There is no dedicated testing spec, no mock strategy, and no defined test baseline.
+The Phase 1 (Local Skeleton) checklist in `platform-docs/PROJECT.md` includes "Unit tests" as a deliverable. The codebase currently has **12 test functions across 5 files**, created as byproducts of other specs or chat-initiated work. There is no dedicated testing spec, no mock strategy, and no defined test baseline.
 
-This spec serves as a **reconciliation point**: it documents the existing tests (attributing their origins), establishes the mock and test strategy, and defines the remaining test coverage needed for Phase 1.
+This spec covers **unit tests only** — all dependencies are mocked. Integration tests (real Postgres, real Redpanda via testcontainers) are a separate Phase 1 deliverable.
+
+This spec serves as a **reconciliation point**: it documents the existing tests (attributing their origins), establishes the mock and test strategy, and defines the remaining unit test coverage needed for Phase 1.
 
 ## Current State
 
@@ -38,7 +40,7 @@ Add comprehensive unit tests for all application-layer code written during Phase
 
 ### Mock Strategy: Hand-Written Mocks
 
-All interfaces in the codebase are small (1–3 methods). The project uses **zero external test libraries** — only the stdlib `testing` package. Hand-written mocks using the **function-field pattern** provide maximum flexibility without adding dependencies.
+All interfaces in the codebase are small (1–3 methods). Hand-written mocks using the **function-field pattern** provide maximum flexibility without adding dependencies.
 
 **Pattern:**
 ```go
@@ -64,15 +66,15 @@ Each package that needs mocks gets a `testhelpers_test.go` file containing mock 
 
 Instead of a percentage target (which incentivizes testing trivial code), acceptance criteria enumerate **specific functions and scenarios**. Phase 1 scope targets the code that has meaningful logic to verify.
 
-### Scope: Phase 1 Only
+### Scope: Unit Tests Only
 
-The following are **explicitly deferred**:
+This spec covers mocked unit tests. The following are **out of scope**:
 
-| Deferred | Reason |
-|----------|--------|
-| Event Consumer (`consumer.go`) | Tightly coupled to Kafka/Redpanda client — needs interface extraction refactoring first |
-| Infrastructure adapters (postgres packages) | Need real database; integration tests require Docker/testcontainers |
-| Concurrency/race tests | Worker pool behavior requires careful goroutine orchestration; not a Phase 1 priority |
+| Out of Scope | Where It Lives |
+|--------------|----------------|
+| Integration tests (real Postgres, Redpanda) | Separate Phase 1 deliverable in PROJECT.md |
+| Event Consumer (`consumer.go`) | Needs interface extraction refactoring first |
+| Concurrency/race tests | Worker pool goroutine behavior — separate effort |
 | E2E tests | Already covered by Spec 006 |
 
 ## Files to Create
@@ -150,7 +152,7 @@ type EventHandler interface {
 - [ ] Config: tests cover `Load()` with env vars and defaults
 - [ ] All mocks use hand-written function-field pattern in `testhelpers_test.go` files
 - [ ] `go test ./...` passes with zero failures
-- [ ] No external test dependencies added
+- [ ] Test dependencies evaluated case-by-case; `testify/assert` adopted for assertion noise reduction
 
 ## Notes
 
@@ -174,6 +176,12 @@ Mock libraries like `testify/mock` and `gomock` are popular in Go, but they solv
 
 **Re-evaluate if interfaces grow.** If Phase 2 introduces interfaces with 5+ methods (e.g., wrapping a complex third-party SDK), gomock's code generation approach (which preserves compile-time safety unlike testify/mock) would be worth reconsidering. For now, hand-written mocks are the simpler, safer, and more idiomatic choice.
 
+### Assertion library: `testify/assert` (not `testify/mock`)
+
+Test dependencies are evaluated case-by-case rather than blanket-prohibited. `testify/assert` is adopted because the noise reduction is substantial — stdlib assertions require 3 lines (if/comparison/t.Errorf with format string) where `assert.Equal` takes one. With 50+ tests, this is real readability overhead.
+
+This is distinct from `testify/mock`, which is *not* adopted. `assert` is pure syntactic sugar — no runtime dispatch, no string-based method names, no type safety tradeoffs. `mock` has fundamental compile-time safety problems (see "Why hand-written mocks" below). They are separate packages with separate tradeoffs.
+
 ### Test naming conventions
 
 Following Go conventions:
@@ -184,6 +192,6 @@ Following Go conventions:
 
 ### Future considerations
 
-- **testcontainers-go** — for integration tests against real PostgreSQL in Phase 2
+- **testcontainers-go** — for integration tests against real PostgreSQL (separate Phase 1 spec)
 - **Race detection** — `go test -race ./...` should pass but is not a formal criterion yet
 - **Benchmark tests** — deferred until performance optimization phase

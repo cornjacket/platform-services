@@ -123,4 +123,4 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [006](006-automated-e2e-tests.md) | Spec | Complete | Automated End-to-End Tests |
 | [007](007-service-client-libraries.md) | Spec | Complete | Service Client Libraries |
 | [008](008-time-handling-strategy.md) | Spec | Complete | Time Handling Strategy (clock injection, dual timestamps) |
-| [009](009-unit-integration-tests.md) | Spec | Draft | Unit and Integration Tests (Phase 1 test baseline) |
+| [009](009-unit-integration-tests.md) | Spec | Complete | Unit Tests (Phase 1 test baseline) |

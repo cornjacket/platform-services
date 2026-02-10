@@ -3,6 +3,8 @@ package clock
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRealClock_Now(t *testing.T) {
@@ -10,79 +12,47 @@ func TestRealClock_Now(t *testing.T) {
 	got := RealClock{}.Now()
 	after := time.Now().UTC()
 
-	if got.Before(before) || got.After(after) {
-		t.Errorf("RealClock.Now() = %v, want between %v and %v", got, before, after)
-	}
+	assert.False(t, got.Before(before), "should not be before current time")
+	assert.False(t, got.After(after), "should not be after current time")
 }
 
 func TestFixedClock_Now(t *testing.T) {
 	fixedTime := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	clock := FixedClock{Time: fixedTime}
 
-	got := clock.Now()
-
-	if !got.Equal(fixedTime) {
-		t.Errorf("FixedClock.Now() = %v, want %v", got, fixedTime)
-	}
-
-	// Should return same time on multiple calls
-	got2 := clock.Now()
-	if !got2.Equal(fixedTime) {
-		t.Errorf("FixedClock.Now() second call = %v, want %v", got2, fixedTime)
-	}
+	assert.Equal(t, fixedTime, clock.Now())
+	assert.Equal(t, fixedTime, clock.Now(), "should return same time on multiple calls")
 }
 
 func TestReplayClock_Advance(t *testing.T) {
 	clock := &ReplayClock{}
+	assert.True(t, clock.Now().IsZero(), "initial time should be zero")
 
-	// Initial time should be zero
-	if !clock.Now().IsZero() {
-		t.Errorf("ReplayClock initial Now() = %v, want zero time", clock.Now())
-	}
-
-	// Advance to first event time
 	event1Time := time.Date(2026, 2, 7, 10, 0, 0, 0, time.UTC)
 	clock.Advance(event1Time)
+	assert.Equal(t, event1Time, clock.Now())
 
-	if !clock.Now().Equal(event1Time) {
-		t.Errorf("ReplayClock.Now() after first advance = %v, want %v", clock.Now(), event1Time)
-	}
-
-	// Advance to second event time
 	event2Time := time.Date(2026, 2, 7, 10, 5, 0, 0, time.UTC)
 	clock.Advance(event2Time)
-
-	if !clock.Now().Equal(event2Time) {
-		t.Errorf("ReplayClock.Now() after second advance = %v, want %v", clock.Now(), event2Time)
-	}
+	assert.Equal(t, event2Time, clock.Now())
 }
 
 func TestPackageLevelClock(t *testing.T) {
-	// Reset to real clock after test
 	t.Cleanup(Reset)
 
-	// Default should be real clock (close to current time)
+	// Default should be real clock
 	before := time.Now().UTC()
 	got := Now()
 	after := time.Now().UTC()
-
-	if got.Before(before.Add(-time.Second)) || got.After(after.Add(time.Second)) {
-		t.Errorf("Now() with default clock = %v, want close to current time", got)
-	}
+	assert.False(t, got.Before(before.Add(-time.Second)))
+	assert.False(t, got.After(after.Add(time.Second)))
 
 	// Set to fixed clock
 	fixedTime := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	Set(FixedClock{Time: fixedTime})
-
-	got = Now()
-	if !got.Equal(fixedTime) {
-		t.Errorf("Now() with fixed clock = %v, want %v", got, fixedTime)
-	}
+	assert.Equal(t, fixedTime, Now())
 
 	// Reset should restore real clock
 	Reset()
-	got = Now()
-	if got.Equal(fixedTime) {
-		t.Errorf("Now() after Reset should not equal fixed time")
-	}
+	assert.NotEqual(t, fixedTime, Now())
 }
