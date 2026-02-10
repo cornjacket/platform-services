@@ -126,3 +126,4 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [009](009-unit-tests.md) | Spec | Complete | Unit Tests (Phase 1 test baseline) |
 | [010](010-integration-tests.md) | Spec | Complete | Integration Tests (real Postgres/Redpanda via docker-compose) |
 | [011](011-service-entry-points.md) | Spec | Complete | Service Entry Points (Start() wrappers, component testing) |
+| [012](012-component-tests.md) | Spec | Draft | Component Tests (full service pipeline via Start()) |
