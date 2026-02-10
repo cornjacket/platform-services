@@ -41,7 +41,6 @@ func NewTestPool(t *testing.T) *pgxpool.Pool {
 }
 
 // RunMigrations applies all .sql files in the given directory, sorted by filename.
-// Logs and skips individual migration files that fail (to handle already-applied migrations).
 func RunMigrations(t *testing.T, pool *pgxpool.Pool, migrationDir string) {
 	t.Helper()
 
@@ -61,7 +60,7 @@ func RunMigrations(t *testing.T, pool *pgxpool.Pool, migrationDir string) {
 			t.Fatalf("failed to read %s: %v", path, err)
 		}
 		if _, err := pool.Exec(context.Background(), string(sql)); err != nil {
-			t.Logf("migration %s: %v (skipping — likely already applied)", entry.Name(), err)
+			t.Fatalf("failed to execute %s: %v", entry.Name(), err)
 		}
 	}
 }
@@ -88,8 +87,7 @@ func MustNewTestPool() *pgxpool.Pool {
 }
 
 // MustRunMigrations applies migrations for use in TestMain (where *testing.T is unavailable).
-// Logs and skips individual migration files that fail (to handle already-applied migrations
-// like ALTER TABLE RENAME which aren't idempotent). Fatals only on directory read errors.
+// Calls log.Fatal on any error. Expects a clean schema (call MustDropAllTables first).
 func MustRunMigrations(pool *pgxpool.Pool, migrationDir string) {
 	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
@@ -106,8 +104,24 @@ func MustRunMigrations(pool *pgxpool.Pool, migrationDir string) {
 			log.Fatalf("failed to read %s: %v", path, err)
 		}
 		if _, err := pool.Exec(context.Background(), string(sql)); err != nil {
-			log.Printf("migration %s: %v (skipping — likely already applied)", entry.Name(), err)
+			log.Fatalf("failed to execute %s: %v", entry.Name(), err)
 		}
+	}
+}
+
+// MustDropAllTables drops all tables in the public schema.
+// Used in TestMain before MustRunMigrations to ensure a clean schema.
+func MustDropAllTables(pool *pgxpool.Pool) {
+	query := `DO $$ DECLARE
+		r RECORD;
+	BEGIN
+		FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+			EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+		END LOOP;
+	END $$`
+
+	if _, err := pool.Exec(context.Background(), query); err != nil {
+		log.Fatalf("failed to drop tables: %v", err)
 	}
 }
 

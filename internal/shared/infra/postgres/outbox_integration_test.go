@@ -23,6 +23,7 @@ var testPool *pgxpool.Pool
 
 func TestMain(m *testing.M) {
 	pool := testutil.MustNewTestPool()
+	testutil.MustDropAllTables(pool)
 	testutil.MustRunMigrations(pool, "../../../services/ingestion/migrations")
 	testPool = pool
 	defer pool.Close()
