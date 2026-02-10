@@ -160,19 +160,20 @@ The `//go:build integration` tag makes integration test files invisible to `go t
 
 ## Acceptance Criteria
 
-- [ ] `internal/testutil/` package provides `NewTestPool`, `RunMigrations`, `TruncateTables`, `TestBrokers`, `TestTopicName`
-- [ ] All testutil files have `//go:build integration` tag
-- [ ] OutboxRepo: 8 integration tests covering insert, fetch, delete, retry, round-trip, and NOTIFY trigger
-- [ ] EventStoreRepo: 3 integration tests covering insert, duplicate constraint (pgconn 23505), and round-trip
-- [ ] PostgresStore: 8 integration tests covering write (insert/update/skip-older/UUID-tiebreaker), get, get-not-found, list, list-empty
-- [ ] Producer: 2 integration tests covering publish verification and partition key routing
-- [ ] Consumer: 1 integration test covering produce→consume→dispatch round-trip
-- [ ] Each test package has `TestMain` that runs migrations
-- [ ] Each test truncates tables before running (Postgres) or uses unique topic names (Redpanda)
-- [ ] `go test ./...` continues to pass (integration tests invisible without tag)
-- [ ] `go test -tags=integration ./...` runs integration tests (requires `docker compose up -d`)
-- [ ] Makefile has `test-integration` and `test-all` targets
-- [ ] PROJECT.md updated: "via testcontainers" → "via docker-compose"
+- [x] `internal/testutil/` package provides `NewTestPool`, `MustNewTestPool`, `RunMigrations`, `MustRunMigrations`, `MustDropAllTables`, `TruncateTables`, `TestBrokers`, `TestTopicName`
+- [x] All testutil files have `//go:build integration` tag
+- [x] OutboxRepo: 8 integration tests covering insert, fetch, delete, retry, round-trip, and NOTIFY trigger
+- [x] EventStoreRepo: 3 integration tests covering insert, duplicate constraint (pgconn 23505), and round-trip
+- [x] PostgresStore: 8 integration tests covering write (insert/update/skip-older/UUID-tiebreaker), get, get-not-found, list, list-empty
+- [x] Producer: 2 integration tests covering publish verification and partition key routing
+- [x] Consumer: 1 integration test covering produce→consume→dispatch round-trip
+- [x] Each `TestMain` drops all tables then runs migrations (`MustDropAllTables` → `MustRunMigrations`), owning the full schema lifecycle
+- [x] Each test truncates tables as its first action (Postgres) or uses unique topic names (Redpanda) for row-level isolation
+- [x] `go test ./...` continues to pass (integration tests invisible without tag)
+- [x] `go test -tags=integration ./...` runs all 22 integration tests (requires `docker compose up -d`)
+- [x] Makefile has `test-integration` and `test-all` targets
+- [x] PROJECT.md updated: "via testcontainers" → "via docker-compose"
+- [x] Migration 002 rewritten with final schema (`event_time` + `ingested_at`); migration 003 (non-idempotent ALTER) deleted
 
 ## Notes
 
