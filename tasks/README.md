@@ -124,4 +124,4 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [007](007-service-client-libraries.md) | Spec | Complete | Service Client Libraries |
 | [008](008-time-handling-strategy.md) | Spec | Complete | Time Handling Strategy (clock injection, dual timestamps) |
 | [009](009-unit-tests.md) | Spec | Complete | Unit Tests (Phase 1 test baseline) |
-| [010](010-integration-tests.md) | Spec | Draft | Integration Tests (real Postgres/Redpanda via docker-compose) |
+| [010](010-integration-tests.md) | Spec | Complete | Integration Tests (real Postgres/Redpanda via docker-compose) |
