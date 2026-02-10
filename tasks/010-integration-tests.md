@@ -1,7 +1,7 @@
 # Spec 010: Integration Tests
 
 **Type:** Spec
-**Status:** Complete
+**Status:** In Progress
 **Created:** 2026-02-10
 **Updated:** 2026-02-10
 
@@ -205,3 +205,74 @@ Transaction rollback (begin tx → run test → rollback) is cleaner in theory b
 ### No interfaces needed
 
 Unlike unit tests (Spec 009) which required defining mock implementations, integration tests exercise the concrete types directly (`OutboxRepo`, `EventStoreRepo`, `PostgresStore`, `Producer`, `Consumer`). The only new code is the `testutil` helpers — no production code refactoring.
+
+---
+
+## Amendment: Drop-and-recreate schema in TestMain + consolidate migrations
+
+**Date:** 2026-02-10
+**Reason:** Post-implementation review revealed two issues: `MustRunMigrations` was a no-op with error suppression, and migration 003 (an ALTER) was unnecessary pre-production.
+
+### Problem
+
+The original design had `TestMain` call `MustRunMigrations` to ensure the schema existed before tests ran. In practice, this was a no-op — the database already had the schema from `make migrate`. Worse, migration 003 (`ALTER TABLE RENAME COLUMN timestamp TO event_time`) isn't idempotent, so `MustRunMigrations` had to swallow errors and log "skipping — likely already applied." This created a false safety net: it looked like it was doing something useful but was actually just producing log noise.
+
+### Root cause (two issues)
+
+**1. `TestMain` didn't own the schema lifecycle.** It assumed migrations would be harmless to re-run. Some DDL is idempotent (`CREATE TABLE IF NOT EXISTS`), but `ALTER TABLE RENAME COLUMN` is not. Suppressing errors masked the real issue.
+
+**2. Migration 003 is an ALTER that only makes sense with a live deployment.** ALTER migrations exist to transform existing data in-place — renaming a column while preserving rows. There is no live deployment. There is no data to preserve. The column should have been named `event_time` from the start.
+
+### Fix (two parts)
+
+**Part 1: Consolidate migrations (pre-production cleanup)**
+
+Rewrite migration 002 to define the final schema with `event_time` and `ingested_at` from the start. Delete migration 003 entirely. This makes all remaining migrations purely `CREATE TABLE/INDEX IF NOT EXISTS` — naturally idempotent.
+
+This is a pre-production-only action. Once a production deployment exists, ALTER migrations are the correct approach and must not be rewritten.
+
+**Part 2: Drop-and-recreate in TestMain (future-proof pattern)**
+
+Even though Part 1 makes current migrations idempotent, `TestMain` should still use drop-then-migrate. Future post-production migrations will contain ALTERs that aren't idempotent. Establishing the pattern now means those future migrations work automatically in the test suite without any changes to test infrastructure.
+
+`TestMain` flow:
+
+```
+MustDropAllTables → MustRunMigrations → m.Run()
+```
+
+`MustDropAllTables` implementation:
+
+```sql
+DO $$ DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END $$
+```
+
+`MustRunMigrations` reverts to the strict version — `log.Fatal` on any error, no skipping. Errors are always real because the schema is always blank.
+
+### What changes
+
+| File | Change |
+|------|--------|
+| `internal/services/ingestion/migrations/002_create_event_store.sql` | Rewrite with `event_time` and `ingested_at` columns and correct indexes (final schema) |
+| `internal/services/ingestion/migrations/003_dual_timestamps.sql` | Delete |
+| `internal/testutil/postgres.go` | Add `MustDropAllTables`. Revert `MustRunMigrations` and `RunMigrations` to fatal on errors (remove skip logic). |
+| `internal/shared/infra/postgres/outbox_integration_test.go` | `TestMain` calls `MustDropAllTables` before `MustRunMigrations` |
+| `internal/shared/projections/postgres_integration_test.go` | Same |
+
+### Why this is better
+
+- **Migrations are exercised on every test run** — a broken migration is caught immediately, not just when someone sets up a fresh database
+- **No idempotency workaround** — migrations run against a clean schema, so every migration's assumptions hold
+- **`TestMain` owns the full schema lifecycle** — no dependency on `make migrate` having been run first
+- **Future-proof** — post-production ALTER migrations will work in tests without any infrastructure changes
+- **`TruncateTables` per test still handles row-level isolation** — schema is set up once in `TestMain`, rows are cleaned between individual tests
+
+### Trade-off
+
+If you're manually inserting test data via `psql` while developing, integration tests will nuke it. This is expected — integration tests own the database state.
