@@ -107,7 +107,7 @@ The first test is the highest-value component test in the system. It exercises: 
 
 #### Query Component Test
 
-**Setup:** Real Postgres pool, seed projections directly via SQL, `Start()` on a test port.
+**Setup:** Real Postgres pool, seed projections via `projections.NewPostgresStore(testPool, logger).WriteProjection(...)`, `Start()` on a test port. This uses the same write path as EventHandler in production — no raw SQL.
 
 | Test | What It Proves |
 |------|----------------|
