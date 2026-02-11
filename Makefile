@@ -1,4 +1,4 @@
-.PHONY: build run test test-integration test-all clean docker-up docker-down migrate-all migrate-ingestion migrate-eventhandler help
+.PHONY: build run test test-integration test-component test-all clean docker-up docker-down migrate-all migrate-ingestion migrate-eventhandler help
 
 # Go parameters
 BINARY_NAME=platform
@@ -23,7 +23,10 @@ test: ## Run tests
 test-integration: ## Run integration tests (requires docker-up)
 	go test -tags=integration -v ./...
 
-test-all: test test-integration ## Run unit and integration tests
+test-component: ## Run component tests (requires docker-up)
+	go test -tags=component -v ./internal/services/...
+
+test-all: test test-integration test-component ## Run unit, integration, and component tests
 
 test-coverage: ## Run tests with coverage
 	go test -cover ./...
