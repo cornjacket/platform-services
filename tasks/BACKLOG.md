@@ -5,3 +5,4 @@ This directory (`backlog/`) contains potential future tasks that are not yet com
 ## Tasks
 
 - [ ] [000_dlq-implementation.md](backlog/000_dlq-implementation.md) - DLQ Implementation Status (Event Handler Service)
+- [ ] [001_review-outbox-implementation.md](backlog/001_review-outbox-implementation.md) - Review Outbox Implementation
