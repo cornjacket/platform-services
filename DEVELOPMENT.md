@@ -91,6 +91,29 @@ platform-services/
 └── DEVELOPMENT.md                   # This file
 ```
 
+## Service Creation Guidelines
+
+When creating a new service for the platform, consider the following general guidelines and requirements to ensure consistency, robustness, and maintainability:
+
+### Core Principles
+
+*   **Repository Pattern**: Services should define interfaces for their dependencies (e.g., data access, external clients) rather than directly implementing concrete infrastructure types. Infrastructure then implements these service-defined interfaces.
+*   **Dependency Inversion**: Services should depend on abstractions (interfaces) rather than concretions.
+*   **Encapsulation**: Each service package should encapsulate its internal wiring (repositories, handlers, routes, servers) within a `Start()` function, exposing only what's necessary for `cmd/platform/main.go` to orchestrate.
+*   **Inject Outputs, Not Inputs**: When designing service `Start()` functions, external output dependencies (e.g., event submitters for downstream services, projection writers for read models) should be injected as interfaces for testability. Inputs (HTTP requests, Redpanda messages) are typically handled internally via server/consumer setup.
+
+### Operational Requirements
+
+*   **Port Bind Failure Handling**: If any service's HTTP server fails to bind its designated port (e.g., due to a port conflict or permission denied), the entire process *must* initiate a graceful shutdown and exit with a non-zero code. Logging the error alone is insufficient.
+    *   **Implementation Note**: Service `Start()` functions should accept an error channel (`chan<- error`) and send any fatal errors (e.g., `http.ListenAndServe` errors) to this channel. The `cmd/platform/main.go` will select on this channel to trigger process-wide shutdown.
+    *   **Reference**: See [Insight: Propagate Async Server Errors to Main](../../platform-docs/insights/development/003-propagate-async-server-errors.md) and [Task 016: Port Collision Does Not Trigger Process Shutdown](tasks/016-port-collision-shutdown.md) for detailed rationale and implementation example.
+*   **Health Check Endpoints**: (Future Requirement) Each service must expose a `GET /health` HTTP endpoint for liveness and readiness checks, returning 200 OK for healthy and 503 Service Unavailable for degraded states. (This is planned for Task 017).
+*   **Configuration**: All service configurations must be loadable from environment variables, following the `CJ_[SERVICE]_[VARIABLE_NAME]` naming convention. Services should accept a service-specific `Config` struct.
+*   **Migrations**: Each service owns its database migrations, which should be embedded into the binary and auto-applied on startup (e.g., using Goose).
+    *   **Reference**: See [Insight: Embed Migrations for Distroless Containers](../../platform-docs/insights/development/002-embed-migrations-for-distroless-containers.md) and [Insight: Per-Service Migration Table Isolation](../../platform-docs/insights/development/001-per-service-migration-table-isolation.md) for more details.
+
+This section provides a high-level overview. Always consult related ADRs, design specifications, and other insights for detailed architectural decisions and implementation specifics.
+
 ## Dependency Rules
 
 ### The Repository Pattern
