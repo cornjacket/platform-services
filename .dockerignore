@@ -1,0 +1,6 @@
+bin/
+.git/
+e2e/
+tasks/
+docker-compose/
+*.md

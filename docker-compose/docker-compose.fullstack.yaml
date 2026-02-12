@@ -1,0 +1,49 @@
+# Fullstack overlay — adds routing, MQTT, and containerized platform.
+# Use with: docker compose -f docker-compose.yaml -f docker-compose.fullstack.yaml up -d --build
+
+services:
+  platform:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: cornjacket-platform
+    environment:
+      CJ_INGESTION_DATABASE_URL: postgres://cornjacket:cornjacket@postgres:5432/cornjacket?sslmode=disable
+      CJ_EVENTHANDLER_DATABASE_URL: postgres://cornjacket:cornjacket@postgres:5432/cornjacket?sslmode=disable
+      CJ_QUERY_DATABASE_URL: postgres://cornjacket:cornjacket@postgres:5432/cornjacket?sslmode=disable
+      CJ_REDPANDA_BROKERS: redpanda:9092
+      CJ_LOG_FORMAT: json
+    depends_on:
+      - postgres
+      - redpanda
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ingestion.rule=PathPrefix(`/api/v1/events`) || Path(`/health`)"
+      - "traefik.http.routers.ingestion.service=ingestion"
+      - "traefik.http.services.ingestion.loadbalancer.server.port=8080"
+      - "traefik.http.routers.query.rule=PathPrefix(`/api/v1/projections`)"
+      - "traefik.http.routers.query.service=query"
+      - "traefik.http.services.query.loadbalancer.server.port=8081"
+
+  traefik:
+    image: traefik:v3.3
+    container_name: cornjacket-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8090:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  emqx:
+    image: emqx/emqx:5.8
+    container_name: cornjacket-emqx
+    ports:
+      - "1883:1883"
+      - "18083:18083"  # EMQX dashboard
+    environment:
+      EMQX_NAME: cornjacket

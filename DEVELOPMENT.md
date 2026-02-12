@@ -80,8 +80,11 @@ platform-services/
 ├── deploy/                          # Deployment code
 │   └── terraform/
 │
-├── docker-compose.yml               # Local dev (infrastructure only)
-├── Dockerfile                       # Production image
+├── docker-compose/
+│   ├── docker-compose.yaml          # Base: infrastructure (Postgres, Redpanda)
+│   └── docker-compose.fullstack.yaml # Overlay: adds Traefik, EMQX, containerized platform
+├── Dockerfile                       # Multi-stage Go build for platform container
+├── .dockerignore                    # Excludes test files, docs from build context
 ├── Makefile                         # Common commands
 ├── go.mod
 ├── go.sum
@@ -188,15 +191,26 @@ internal/shared/infra/postgres ───implements───► internal/services
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.25+
 - Docker with Compose plugin (`docker compose`)
 - Make (optional, for convenience commands)
 
-### Running Locally
+### Two Modes
+
+The project supports two Docker Compose modes:
+
+| Mode | Command | Platform runs as | Use case |
+|------|---------|-----------------|----------|
+| **Skeleton** | `make skeleton-up` | Binary on host | Fast Go iteration, debugging |
+| **Fullstack** | `make fullstack-up` | Container (behind Traefik) | Production fidelity, routing tests |
+
+Skeleton mode is the default for day-to-day development.
+
+### Running Locally (Skeleton Mode)
 
 1. Start infrastructure:
    ```bash
-   docker compose up -d
+   make skeleton-up
    ```
 
 2. Run migrations:
@@ -219,16 +233,30 @@ internal/shared/infra/postgres ───implements───► internal/services
    - Query API: http://localhost:8081
    - Actions API: http://localhost:8083
 
+### Running Locally (Fullstack Mode)
+
+1. Start everything:
+   ```bash
+   make fullstack-up
+   ```
+
+2. Access points:
+   - Platform (via Traefik): http://localhost
+   - Traefik dashboard: http://localhost:8090
+   - EMQX dashboard: http://localhost:18083
+   - MQTT broker: localhost:1883
+
 ### Starting Fresh
 
 To reset the database and start with a clean slate:
 
 ```bash
 # Stop containers and remove volumes (destroys all data)
-docker compose down -v
+make skeleton-down
+docker compose -f docker-compose/docker-compose.yaml down -v
 
 # Start fresh
-docker compose up -d
+make skeleton-up
 make migrate-all
 ```
 
@@ -244,7 +272,7 @@ curl -X POST http://localhost:8080/api/v1/events \
 # {"event_id":"<uuid>","status":"accepted"}
 
 # Verify the event is in the outbox (should be empty after processing)
-docker compose exec postgres psql -U cornjacket -d cornjacket -c "SELECT * FROM outbox;"
+docker compose -f docker-compose/docker-compose.yaml exec postgres psql -U cornjacket -d cornjacket -c "SELECT * FROM outbox;"
 
 # Check health endpoint
 curl http://localhost:8080/health
@@ -271,7 +299,7 @@ curl -X POST http://localhost:8080/api/v1/events \
 sleep 2
 
 # 4. Verify projections were created
-docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+docker compose -f docker-compose/docker-compose.yaml exec postgres psql -U cornjacket -d cornjacket -c \
   "SELECT projection_type, aggregate_id, state FROM projections ORDER BY projection_type;"
 
 # Expected output:
@@ -281,11 +309,11 @@ docker compose exec postgres psql -U cornjacket -d cornjacket -c \
 #  user_session    | user-123     | {"ip": "192.168.1.1", "user_id": "user-123"}
 
 # 5. Verify event is in event_store
-docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+docker compose -f docker-compose/docker-compose.yaml exec postgres psql -U cornjacket -d cornjacket -c \
   "SELECT event_id, event_type, aggregate_id FROM event_store ORDER BY timestamp DESC LIMIT 5;"
 
 # 6. Verify outbox is empty (all events processed)
-docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+docker compose -f docker-compose/docker-compose.yaml exec postgres psql -U cornjacket -d cornjacket -c \
   "SELECT COUNT(*) FROM outbox;"
 # Expected: 0
 
@@ -297,7 +325,7 @@ curl -X POST http://localhost:8080/api/v1/events \
 sleep 2
 
 # 8. Verify projection was updated
-docker compose exec postgres psql -U cornjacket -d cornjacket -c \
+docker compose -f docker-compose/docker-compose.yaml exec postgres psql -U cornjacket -d cornjacket -c \
   "SELECT state FROM projections WHERE projection_type = 'sensor_state' AND aggregate_id = 'device-001';"
 # Expected: {"unit": "fahrenheit", "value": 75.0}
 ```
@@ -306,26 +334,38 @@ docker compose exec postgres psql -U cornjacket -d cornjacket -c \
 
 ```bash
 # List topics
-docker compose exec redpanda rpk topic list
+docker compose -f docker-compose/docker-compose.yaml exec redpanda rpk topic list
 
 # Consume messages from sensor-events topic
-docker compose exec redpanda rpk topic consume sensor-events --num 5
+docker compose -f docker-compose/docker-compose.yaml exec redpanda rpk topic consume sensor-events --num 5
 
 # Consume messages from user-actions topic
-docker compose exec redpanda rpk topic consume user-actions --num 5
+docker compose -f docker-compose/docker-compose.yaml exec redpanda rpk topic consume user-actions --num 5
 ```
 
 ### Running Tests
 
 ```bash
 # Unit tests
-go test ./...
+make test
 
 # With coverage
-go test -cover ./...
+make test-coverage
 
-# Component tests (requires docker compose up)
-go test -tags=component ./...
+# Integration tests (requires make skeleton-up)
+make test-integration
+
+# Component tests (requires make skeleton-up)
+make test-component
+
+# All tests
+make test-all
+
+# E2E tests against skeleton (requires make dev)
+make e2e-skeleton
+
+# E2E tests against fullstack (requires make fullstack-up)
+make e2e-fullstack
 ```
 
 ## Configuration
