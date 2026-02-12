@@ -178,6 +178,9 @@ Requires: `make fullstack-up` (migrations run inside the container or via init c
 | `.dockerignore` | Create | Exclude test files, docs, bin/ from build context |
 | `Makefile` | Modify | New targets, updated paths |
 | `docker-compose.yml` | Delete | Replaced by `docker-compose/docker-compose.yaml` |
+| `platform-docs/PROJECT.md` | Modify | Mark task complete in Phase 2 checklist, update Current Focus |
+| `platform-docs/design-spec.md` | Modify | Document skeleton/fullstack modes and compose layering |
+| `platform-services/DEVELOPMENT.md` | Modify | Update docker commands to reflect new targets (`skeleton-up`, `fullstack-up`) |
 
 ## Acceptance Criteria
 
@@ -195,7 +198,9 @@ Requires: `make fullstack-up` (migrations run inside the container or via init c
 - [ ] Component tests still work: `make skeleton-up && make test-component`
 - [ ] Migration targets work with new compose paths
 - [ ] `docker-up` / `docker-down` removed (no legacy aliases)
-- [ ] Update PROJECT.md to reflect task completion
+- [ ] `platform-docs/design-spec.md` documents skeleton/fullstack modes and compose layering
+- [ ] `DEVELOPMENT.md` updated with new `make` targets and workflow
+- [ ] Update `platform-docs/PROJECT.md` to reflect task completion
 
 ## Notes
 
