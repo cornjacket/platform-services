@@ -54,9 +54,11 @@ fullstack-logs: ## Show full stack logs
 docker-build: ## Build the platform container image
 	docker build -t cornjacket-platform .
 
-# ── Migrations (per-service, ADR-0010) ───────────────────────
+# ── Migrations (per-service, ADR-0010/0016) ──────────────────
+# NOTE: The platform binary auto-applies migrations on startup (ADR-0016).
+# These targets are retained for local dev resets only (drop + re-create).
 
-migrate-ingestion: ## Run ingestion service migrations
+migrate-ingestion: ## Run ingestion service migrations (dev reset only)
 	@echo "Running ingestion migrations..."
 	@for f in internal/services/ingestion/migrations/*.sql; do \
 		echo "Applying $$f..."; \
@@ -64,7 +66,7 @@ migrate-ingestion: ## Run ingestion service migrations
 	done
 	@echo "Ingestion migrations complete."
 
-migrate-eventhandler: ## Run event handler migrations
+migrate-eventhandler: ## Run event handler migrations (dev reset only)
 	@echo "Running event handler migrations..."
 	@for f in internal/services/eventhandler/migrations/*.sql; do \
 		echo "Applying $$f..."; \
@@ -119,4 +121,4 @@ clean: ## Clean build artifacts
 
 # ── Development Workflow ─────────────────────────────────────
 
-dev: skeleton-up migrate-all run ## Full dev setup: start infrastructure, migrate, run app
+dev: skeleton-up run ## Full dev setup: start infrastructure, run app (binary auto-migrates)

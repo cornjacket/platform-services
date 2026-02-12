@@ -13,9 +13,12 @@ services:
       CJ_QUERY_DATABASE_URL: postgres://cornjacket:cornjacket@postgres:5432/cornjacket?sslmode=disable
       CJ_REDPANDA_BROKERS: redpanda:9092
       CJ_LOG_FORMAT: json
+    restart: on-failure
     depends_on:
-      - postgres
-      - redpanda
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ingestion.rule=PathPrefix(`/api/v1/events`) || Path(`/health`)"

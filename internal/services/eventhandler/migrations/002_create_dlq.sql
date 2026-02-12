@@ -1,3 +1,4 @@
+-- +goose Up
 -- Dead Letter Queue table - stores failed events for debugging and replay
 -- Per-consumer DLQ in Postgres (not Redpanda topic)
 

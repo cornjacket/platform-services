@@ -1,3 +1,4 @@
+-- +goose Up
 -- Projections table - materialized views for queries (CQRS read side)
 -- Updated by the Event Handler when it consumes events from Redpanda
 

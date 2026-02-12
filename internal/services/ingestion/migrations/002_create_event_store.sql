@@ -1,3 +1,4 @@
+-- +goose Up
 -- Event store table - append-only log of all events (CQRS write side)
 -- This is the source of truth for all events in the system
 --

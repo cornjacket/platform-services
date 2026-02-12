@@ -129,4 +129,4 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [012](012-component-tests.md) | Spec | Complete | Component Tests (full service pipeline via Start()) |
 | [013](013-brainstorm-phase-2-implementation.md) | Task | Complete | Brainstorm Phase 2 Implementation |
 | [014](014-docker-compose-restructure.md) | Spec | Complete | Docker Compose Restructure & Platform Containerization |
-| [015](015-embedded-migrations.md) | Spec | Draft | Embedded Migrations (service-owned, auto-applied on startup) |
+| [015](015-embedded-migrations.md) | Spec | Complete | Embedded Migrations (service-owned, auto-applied on startup) |

@@ -62,6 +62,18 @@ func main() {
 	}
 	defer queryPG.Close()
 
+	// Run migrations (per-service, per ADR-0016)
+	slog.Info("running database migrations...")
+	if err := postgres.RunMigrations(cfg.DatabaseURLIngestion, ingestion.MigrationFS, "migrations", "goose_ingestion"); err != nil {
+		slog.Error("ingestion migration failed", "error", err)
+		os.Exit(1)
+	}
+	if err := postgres.RunMigrations(cfg.DatabaseURLEventHandler, eventhandler.MigrationFS, "migrations", "goose_eventhandler"); err != nil {
+		slog.Error("eventhandler migration failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("database migrations complete")
+
 	// Create shared external resources
 	brokers := strings.Split(cfg.RedpandaBrokers, ",")
 	redpandaProducer, err := redpanda.NewProducer(brokers, logger)
