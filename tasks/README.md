@@ -21,6 +21,13 @@ NNN-description.md
 - `NNN` — Sequential number (001, 002, ...)
 - `description` — Kebab-case description
 
+**IMPORTANT: Source of Truth for Numbering**
+The task list in this `README.md` is the **single source of truth** for task numbering. Before creating a new task document, always:
+1.  Consult the `## Index` section below to find the highest sequential number.
+2.  Assign the next available number (`Highest + 1`) to your new task.
+3.  Add the new task to the `## Index` section of this `README.md` immediately upon creation.
+Task file names *must* match the number and description in this index to maintain consistency and prevent conflicts.
+
 ## Spec Template (heavyweight)
 
 ```markdown
@@ -115,18 +122,20 @@ To avoid document proliferation, closely related tasks done in the same session 
 
 | # | Type | Status | Description |
 |---|------|--------|-------------|
-| [001](001-outbox-processor.md) | Spec | Complete | Ingestion Worker (NOTIFY/LISTEN) |
-| [002](002-uuid-v7-migration.md) | Spec | Complete | UUID v7 Migration |
-| [003](003-event-handler.md) | Spec | Complete | Event Handler (Redpanda consumer → projections) |
-| [004](004-structured-logging.md) | Spec | Complete | Configurable Log Level and Format |
-| [005](005-query-service.md) | Spec | Complete | Query Service |
-| [006](006-automated-e2e-tests.md) | Spec | Complete | Automated End-to-End Tests |
-| [007](007-service-client-libraries.md) | Spec | Complete | Service Client Libraries |
-| [008](008-time-handling-strategy.md) | Spec | Complete | Time Handling Strategy (clock injection, dual timestamps) |
-| [009](009-unit-tests.md) | Spec | Complete | Unit Tests (Phase 1 test baseline) |
-| [010](010-integration-tests.md) | Spec | Complete | Integration Tests (real Postgres/Redpanda via docker-compose) |
-| [011](011-service-entry-points.md) | Spec | Complete | Service Entry Points (Start() wrappers, component testing) |
-| [012](012-component-tests.md) | Spec | Complete | Component Tests (full service pipeline via Start()) |
-| [013](013-brainstorm-phase-2-implementation.md) | Task | Complete | Brainstorm Phase 2 Implementation |
+| [001](001-outbox-processor.md) | Task | Complete | Outbox Processor |
+| [002](002-uuid-v7-migration.md) | Task | Complete | UUID v7 Migration |
+| [003](003-event-handler.md) | Task | Complete | Event Handler |
+| [004](004-structured-logging.md) | Task | Complete | Configurable Log Level and Format |
+| [005](005-query-service.md) | Task | Complete | Query Service |
+| [006](006-automated-e2e-tests.md) | Task | Complete | Automated End-to-End Tests |
+| [007](007-service-client-libraries.md) | Task | Complete | Service Client Libraries |
+| [008](008-time-handling-strategy.md) | Task | Complete | Time Handling Strategy |
+| [009](009-unit-tests.md) | Spec | Complete | Unit Tests |
+| [010](010-integration-tests.md) | Spec | Complete | Integration Tests |
+| [011](011-service-entry-points.md) | Spec | Complete | Service Entry Points |
+| [012](012-component-tests.md) | Spec | Complete | Component Tests |
+| [013](013-brainstorm-phase-2-implementation.md) | Task | In Progress | Brainstorm Phase 2 Implementation |
 | [014](014-docker-compose-restructure.md) | Spec | Complete | Docker Compose Restructure & Platform Containerization |
-| [015](015-embedded-migrations.md) | Spec | Complete | Embedded Migrations (service-owned, auto-applied on startup) |
+| [015](015-embedded-migrations.md) | Spec | Complete | Embedded Migrations (Service-Owned, Auto-Applied on Startup) |
+| [016](016-port-collision-shutdown.md) | Task | In Progress | Bug: Port Collision Does Not Trigger Process Shutdown |
+| [017](017-service-health-checks.md) | Task | In Progress | Service Health Check Endpoints |

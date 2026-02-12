@@ -424,6 +424,26 @@ go run ./cmd/platform
 - Implementations: describe technology (e.g., `PostgresOutboxRepo`, `RedpandaProducer`)
 - Files: lowercase, match primary type (e.g., `repository.go`, `service.go`)
 
+## Task Management Process
+
+The development workflow for this project is driven by explicit task documents. These documents are categorized as "Specs" (for new features or significant changes) or "Tasks" (for bug fixes or minor improvements).
+
+All task documents are managed within the `tasks/` directory, with a dedicated `tasks/README.md` serving as the **single source of truth for task numbering and indexing**.
+
+### Key Principles:
+
+1.  **Task Document First**: Every change to the codebase *must* have an accompanying task document (Spec or Task).
+2.  **Sequential Numbering**: Task documents are numbered sequentially (e.g., `001-description.md`, `002-description.md`).
+3.  **`tasks/README.md` Index**: This `README.md` contains the authoritative list of all active and completed tasks. When creating a new task:
+    *   **Always consult the `## Index` section** in `tasks/README.md` to find the highest sequential number.
+    *   **Assign the next available number** (`Highest + 1`) to your new task.
+    *   **Immediately add the new task to the `## Index` section** of `tasks/README.md` upon creation, before writing the actual task file content. This reserves the number and keeps the index up-to-date.
+    *   Task file names (`NNN-description.md`) *must* match the number and description in this index to maintain consistency.
+4.  **Backlog Management**: For potential future tasks not yet committed for immediate implementation, use the `tasks/backlog/` directory. These are indexed in `tasks/BACKLOG.md`. When a backlog item is promoted to an active task, it follows the numbering process described above.
+5.  **`PROJECT.md` Updates**: For tasks that impact the overall project status, remember to update `platform-docs/PROJECT.md` to reflect task completion. This is typically done for milestones or significant deliverables.
+
+This structured approach ensures clear communication of project progress and maintains a consistent, traceable development history.
+
 ## Related Documentation
 
 - [Project Plan](../platform-docs/PROJECT.md) — Current phase and milestones
