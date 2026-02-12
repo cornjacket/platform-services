@@ -86,6 +86,8 @@ func main() {
 	eventSubmitter := ehclient.New(redpandaProducer, logger)
 	projectionsStore := projections.NewPostgresStore(eventHandlerPG.Pool(), logger)
 
+	errCh := make(chan error, 1) // Shared channel for services to report fatal errors
+
 	// Start services
 	ingestionSvc, err := ingestion.Start(ctx, ingestion.Config{
 		Port:         cfg.PortIngestion,
@@ -94,7 +96,7 @@ func main() {
 		MaxRetries:   cfg.OutboxMaxRetries,
 		PollInterval: cfg.OutboxPollInterval,
 		DatabaseURL:  cfg.DatabaseURLIngestion,
-	}, ingestionPG.Pool(), eventSubmitter, logger)
+	}, ingestionPG.Pool(), eventSubmitter, logger, errCh) // Pass error channel
 	if err != nil {
 		slog.Error("failed to start ingestion service", "error", err)
 		os.Exit(1)
@@ -114,7 +116,7 @@ func main() {
 
 	querySvc, err := query.Start(ctx, query.Config{
 		Port: cfg.PortQuery,
-	}, queryPG.Pool(), logger)
+	}, queryPG.Pool(), logger, errCh) // Pass error channel
 	if err != nil {
 		slog.Error("failed to start query service", "error", err)
 		os.Exit(1)
@@ -127,6 +129,8 @@ func main() {
 	select {
 	case sig := <-sigCh:
 		slog.Info("received shutdown signal", "signal", sig)
+	case svcErr := <-errCh: // A service reported a fatal error
+		slog.Error("fatal service error, initiating shutdown", "error", svcErr)
 	case <-ctx.Done():
 		slog.Info("context cancelled")
 	}

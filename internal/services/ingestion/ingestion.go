@@ -33,7 +33,7 @@ type RunningService struct {
 // Start starts the ingestion HTTP server and outbox worker.
 // It creates all internal wiring (repos, handlers, routes) from the provided pool.
 // The submitter is the service's output — where processed events are sent downstream.
-func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, submitter worker.EventSubmitter, logger *slog.Logger) (*RunningService, error) {
+func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, submitter worker.EventSubmitter, logger *slog.Logger, errorCh chan<- error) (*RunningService, error) {
 	logger = logger.With("service", "ingestion")
 
 	// Create repositories from pool
@@ -82,6 +82,7 @@ func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, submitter worker
 		logger.Info("starting ingestion server", "port", cfg.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("ingestion server error", "error", err)
+			errorCh <- fmt.Errorf("ingestion server failed: %w", err)
 		}
 	}()
 
@@ -89,6 +90,7 @@ func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, submitter worker
 	go func() {
 		if err := proc.Start(ctx); err != nil {
 			logger.Error("ingestion worker error", "error", err)
+			errorCh <- fmt.Errorf("ingestion worker failed: %w", err)
 		}
 	}()
 

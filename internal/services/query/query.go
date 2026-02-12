@@ -25,7 +25,7 @@ type RunningService struct {
 
 // Start starts the query HTTP server.
 // It creates the projections store from the provided pool and wires the service internally.
-func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, logger *slog.Logger) (*RunningService, error) {
+func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, logger *slog.Logger, errorCh chan<- error) (*RunningService, error) {
 	logger = logger.With("service", "query")
 
 	// Create projections store from pool
@@ -51,6 +51,7 @@ func Start(ctx context.Context, cfg Config, pool *pgxpool.Pool, logger *slog.Log
 		logger.Info("starting query server", "port", cfg.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("query server error", "error", err)
+			errorCh <- fmt.Errorf("query server failed: %w", err)
 		}
 	}()
 

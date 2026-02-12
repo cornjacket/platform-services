@@ -164,3 +164,44 @@ func TestIngestion_EventStoreWrite(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
+
+func TestIngestion_PortCollisionShutdown(t *testing.T) {
+	mock := &channelSubmitter{calls: make(chan *events.Envelope, 1)}
+	errorCh := make(chan error, 1)
+
+	// Start first instance (should succeed)
+	svc1, err := Start(context.Background(), Config{
+		Port:         testPort,
+		WorkerCount:  1,
+		BatchSize:    10,
+		MaxRetries:   3,
+		PollInterval: 100 * time.Millisecond,
+		DatabaseURL:  testDBURL,
+	}, testPool, mock, testLogger(), errorCh)
+	require.NoError(t, err)
+	defer svc1.Shutdown(context.Background())
+
+	// Give server time to bind
+	time.Sleep(50 * time.Millisecond)
+
+	// Attempt to start second instance on the same port (should fail)
+	svc2, err := Start(context.Background(), Config{
+		Port:         testPort,
+		WorkerCount:  1,
+		BatchSize:    10,
+		MaxRetries:   3,
+		PollInterval: 100 * time.Millisecond,
+		DatabaseURL:  testDBURL,
+	}, testPool, mock, testLogger(), errorCh)
+	require.NoError(t, err, "second service start should not return error directly")
+	defer svc2.Shutdown(context.Background()) // No-op if not started properly
+
+	// Verify an error is reported on the errorCh
+	select {
+	case reportedErr := <-errorCh:
+		assert.Error(t, reportedErr)
+		assert.Contains(t, reportedErr.Error(), fmt.Sprintf("address already in use (listener on :%d)", testPort))
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for port collision error")
+	}
+}
