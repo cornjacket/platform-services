@@ -127,3 +127,5 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [010](010-integration-tests.md) | Spec | Complete | Integration Tests (real Postgres/Redpanda via docker-compose) |
 | [011](011-service-entry-points.md) | Spec | Complete | Service Entry Points (Start() wrappers, component testing) |
 | [012](012-component-tests.md) | Spec | Complete | Component Tests (full service pipeline via Start()) |
+| [013](013-brainstorm-phase-2-implementation.md) | Task | Complete | Brainstorm Phase 2 Implementation |
+| [014](014-docker-compose-restructure.md) | Spec | Draft | Docker Compose Restructure & Platform Containerization |
