@@ -40,17 +40,20 @@ func testLogger() *slog.Logger {
 
 const testPort = 18081
 
-func startQuery(t *testing.T) *RunningService {
+func startQuery(t *testing.T, errorCh chan<- error) *RunningService {
 	t.Helper()
 	ctx := context.Background()
 
-	svc, err := Start(ctx, Config{Port: testPort}, testPool, testLogger())
+	svc, err := Start(ctx, Config{Port: testPort}, testPool, testLogger(), errorCh)
 	require.NoError(t, err)
 
 	// Give server time to bind
 	time.Sleep(50 * time.Millisecond)
 
 	t.Cleanup(func() {
+		// Ensure that the errorCh is not closed by the service before the test can read from it.
+		// A common pattern is to just pass a buffered channel that the test then checks.
+		// If the service sends an error, the test will catch it.
 		svc.Shutdown(context.Background())
 	})
 
@@ -82,7 +85,7 @@ func httpGet(t *testing.T, path string) *http.Response {
 
 func TestQuery_GetProjection(t *testing.T) {
 	testutil.TruncateTables(t, testPool, "projections")
-	startQuery(t)
+	startQuery(t, nil)
 
 	seedProjection(t, "sensor_state", "device-100", map[string]any{"temperature": 22.0})
 
@@ -103,7 +106,7 @@ func TestQuery_GetProjection(t *testing.T) {
 
 func TestQuery_GetProjection_NotFound(t *testing.T) {
 	testutil.TruncateTables(t, testPool, "projections")
-	startQuery(t)
+	startQuery(t, nil)
 
 	resp := httpGet(t, "/api/v1/projections/sensor_state/nonexistent")
 	defer resp.Body.Close()
@@ -113,7 +116,7 @@ func TestQuery_GetProjection_NotFound(t *testing.T) {
 
 func TestQuery_ListProjections(t *testing.T) {
 	testutil.TruncateTables(t, testPool, "projections")
-	startQuery(t)
+	startQuery(t, nil)
 
 	// Seed 3 projections
 	for i := 0; i < 3; i++ {

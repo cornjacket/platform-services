@@ -53,7 +53,7 @@ func testLogger() *slog.Logger {
 const testDBURL = "postgres://cornjacket:cornjacket@localhost:5432/cornjacket?sslmode=disable"
 const testPort = 18080
 
-func startIngestion(t *testing.T, mock *channelSubmitter) *RunningService {
+func startIngestion(t *testing.T, mock *channelSubmitter, errorCh chan<- error) *RunningService {
 	t.Helper()
 	ctx := context.Background()
 
@@ -64,7 +64,7 @@ func startIngestion(t *testing.T, mock *channelSubmitter) *RunningService {
 		MaxRetries:   3,
 		PollInterval: 100 * time.Millisecond,
 		DatabaseURL:  testDBURL,
-	}, testPool, mock, testLogger())
+	}, testPool, mock, testLogger(), errorCh)
 	require.NoError(t, err)
 
 	// Give server time to bind
@@ -93,7 +93,7 @@ func postEvent(t *testing.T, body any) *http.Response {
 func TestIngestion_IngestToSubmit(t *testing.T) {
 	testutil.TruncateTables(t, testPool, "outbox", "event_store")
 	mock := &channelSubmitter{calls: make(chan *events.Envelope, 10)}
-	startIngestion(t, mock)
+	startIngestion(t, mock, nil) // Pass nil for errorCh
 
 	resp := postEvent(t, map[string]any{
 		"event_type":   "sensor.reading",
@@ -116,7 +116,7 @@ func TestIngestion_IngestToSubmit(t *testing.T) {
 func TestIngestion_InvalidPayload(t *testing.T) {
 	testutil.TruncateTables(t, testPool, "outbox", "event_store")
 	mock := &channelSubmitter{calls: make(chan *events.Envelope, 10)}
-	startIngestion(t, mock)
+	startIngestion(t, mock, nil) // Pass nil for errorCh
 
 	// Post invalid JSON (missing required fields)
 	resp := postEvent(t, map[string]any{
@@ -138,7 +138,7 @@ func TestIngestion_InvalidPayload(t *testing.T) {
 func TestIngestion_EventStoreWrite(t *testing.T) {
 	testutil.TruncateTables(t, testPool, "outbox", "event_store")
 	mock := &channelSubmitter{calls: make(chan *events.Envelope, 10)}
-	startIngestion(t, mock)
+	startIngestion(t, mock, nil) // Pass nil for errorCh
 
 	resp := postEvent(t, map[string]any{
 		"event_type":   "sensor.reading",
@@ -200,7 +200,7 @@ func TestIngestion_PortCollisionShutdown(t *testing.T) {
 	select {
 	case reportedErr := <-errorCh:
 		assert.Error(t, reportedErr)
-		assert.Contains(t, reportedErr.Error(), fmt.Sprintf("address already in use (listener on :%d)", testPort))
+		assert.Contains(t, reportedErr.Error(), fmt.Sprintf("ingestion server failed: listen tcp :%d: bind: address already in use", testPort))
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for port collision error")
 	}

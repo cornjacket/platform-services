@@ -444,6 +444,27 @@ All task documents are managed within the `tasks/` directory, with a dedicated `
 
 This structured approach ensures clear communication of project progress and maintains a consistent, traceable development history.
 
+## Definition of Done for a Development Task
+
+A development task (whether a Spec or a Task) is considered "Done" when **all** of the following criteria are met:
+
+1.  **Code Complete:** All functional requirements of the task are implemented.
+2.  **Tests Pass:**
+    *   **Unit Tests:** All `make test` pass.
+    *   **Integration Tests:** All `make test-integration` pass (if applicable to the changes).
+    *   **Component Tests:** All `make test-component` pass (if applicable to the changes).
+    *   **E2E Tests:** All `make e2e-skeleton` and/or `make e2e-fullstack` pass for relevant scenarios (if applicable to the changes).
+    *   *(Note: The `make test-all` target can be used to run all tiers of tests conveniently.)*
+3.  **Code Reviewed:** (Future) Code has been formally reviewed and approved (implies a Pull Request process, which will be defined in a future phase).
+4.  **Documentation Updated:**
+    *   The task document (`NNN-description.md`) status is set to "Complete."
+    *   The `platform-services/tasks/README.md` index is updated (if a new task or status change occurred).
+    *   `platform-docs/PROJECT.md` is updated to reflect task completion (if the task is a milestone or listed in "Current Focus").
+    *   Relevant inline code comments, API docs, design documents (`design-spec.md`), and architectural records (`ARCHITECTURE.md`, ADRs) are up-to-date and reflect the changes.
+5.  **Insights Captured:** Any new insights, patterns, or lessons discovered during the task's implementation are recorded in `platform-docs/insights/` or `ai-builder-lessons/`.
+
+This comprehensive definition ensures that tasks are not just "coded," but truly completed to a high standard, contributing to the overall quality and maintainability of the project.
+
 ## Related Documentation
 
 - [Project Plan](../platform-docs/PROJECT.md) — Current phase and milestones
