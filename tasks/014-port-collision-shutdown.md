@@ -1,7 +1,7 @@
 # Bug: Port Collision Does Not Trigger Process Shutdown
 
 **Type:** Task (Bug)
-**Status:** Pending
+**Status:** In Progress
 **Created:** 2026-02-12
 
 ## Context

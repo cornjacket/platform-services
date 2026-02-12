@@ -1,7 +1,7 @@
 # Service Health Check Endpoints
 
 **Type:** Task
-**Status:** Pending
+**Status:** In Progress
 **Created:** 2026-02-12
 
 ## Context
