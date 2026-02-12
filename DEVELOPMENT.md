@@ -102,6 +102,17 @@ When creating a new service for the platform, consider the following general gui
 *   **Encapsulation**: Each service package should encapsulate its internal wiring (repositories, handlers, routes, servers) within a `Start()` function, exposing only what's necessary for `cmd/platform/main.go` to orchestrate.
 *   **Inject Outputs, Not Inputs**: When designing service `Start()` functions, external output dependencies (e.g., event submitters for downstream services, projection writers for read models) should be injected as interfaces for testability. Inputs (HTTP requests, Redpanda messages) are typically handled internally via server/consumer setup.
 
+### Testing Requirements
+
+New services *must* be accompanied by a comprehensive testing strategy across relevant tiers:
+
+*   **Unit Tests**: Test individual functions and methods in isolation, mocking all external dependencies. Ensure high code coverage for core logic.
+*   **Integration Tests**: Verify interactions with real infrastructure adapters (e.g., database repositories, message bus producers/consumers) against live (but test-isolated) instances. These require the skeleton `docker-compose` environment (`make skeleton-up`).
+*   **Component Tests**: Exercise the service through its `Start()` entry point, using real infrastructure for inputs and mock interfaces for outputs. This verifies the service's internal wiring and end-to-end pipeline within its boundary. These also require the skeleton `docker-compose` environment (`make skeleton-up`).
+*   **E2E Tests**: For services that introduce new end-to-end flows, comprehensive E2E tests are required to validate the entire system's behavior. These run against either the skeleton (`make e2e-skeleton`) or fullstack (`make e2e-fullstack`) local environments.
+
+*Reference the "Running Tests" section for specific `make` commands to execute these test tiers.*
+
 ### Operational Requirements
 
 *   **Port Bind Failure Handling**: If any service's HTTP server fails to bind its designated port (e.g., due to a port conflict or permission denied), the entire process *must* initiate a graceful shutdown and exit with a non-zero code. Logging the error alone is insufficient.
