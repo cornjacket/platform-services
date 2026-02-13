@@ -53,4 +53,4 @@ Implementation is tracked in [Spec 014: Docker Compose Restructure & Platform Co
 
 - [x] All three brainstorming questions resolved with clear decisions
 - [x] Spec 014 created to track implementation
-- [ ] Update PROJECT.md to reflect task completion
+- [x] Update PROJECT.md to reflect task completion

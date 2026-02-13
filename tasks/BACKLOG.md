@@ -6,4 +6,6 @@ This directory (`backlog/`) contains potential future tasks that are not yet com
 
 - [ ] [000_dlq-implementation.md](backlog/000_dlq-implementation.md) - DLQ Implementation Status (Event Handler Service)
 - [ ] [001_review-outbox-implementation.md](backlog/001_review-outbox-implementation.md) - Review Outbox Implementation
+- [ ] [002_replace-integration-test-polling-with-channels.md](backlog/002_replace-integration-test-polling-with-channels.md) - Replace Integration Test Polling with Channel-Based Pattern
+- [ ] [003_service-health-checks.md](backlog/003_service-health-checks.md) - Service Health Check Endpoints
 
