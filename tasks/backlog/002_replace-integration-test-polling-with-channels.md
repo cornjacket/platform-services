@@ -55,4 +55,4 @@ Replace the polling/mutex pattern in `TestConsumerRoundTrip` with the channel-ba
 
 - This is a test-only change; no production code affected.
 - The integration test tests a different boundary (individual consumer adapter) than the component test (full service pipeline via `Start()`), so both tests should continue to exist.
-- See `platform-docs/design-spec.md` section 15.3 for documentation of the channel-based pattern.
+- See `platform-docs/design-spec/15-testing.md` section 15.3 for documentation of the channel-based pattern.

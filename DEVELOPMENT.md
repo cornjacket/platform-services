@@ -406,7 +406,7 @@ make e2e-fullstack
 
 Configuration is loaded from environment variables with the naming convention `CJ_[SERVICE]_[VARIABLE_NAME]`.
 
-**Complete reference:** See [design-spec.md section 12](../platform-docs/design-spec.md#12-environment-variables) for all variables, defaults, and per-environment values.
+**Complete reference:** See [design-spec section 12](../platform-docs/design-spec/12-environment-variables.md) for all variables, defaults, and per-environment values.
 
 ### Local Development Defaults
 

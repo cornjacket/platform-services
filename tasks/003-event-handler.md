@@ -19,7 +19,7 @@ The Outbox Processor publishes events to Redpanda topics. The Event Handler cons
 See:
 - [ADR-0003 CQRS with Eventual Consistency](../../platform-docs/decisions/0003-cqrs-with-eventual-consistency.md)
 - [ADR-0014 Event Handler Consumer Strategy](../../platform-docs/decisions/0014-event-handler-consumer-strategy.md)
-- [Design Spec — Event Types](../../platform-docs/design-spec.md#4-event-types)
+- [Design Spec — Event Types](../../platform-docs/design-spec/04-event-types.md)
 
 ## Functionality
 

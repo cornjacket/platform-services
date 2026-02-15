@@ -138,4 +138,4 @@ To avoid document proliferation, closely related tasks done in the same session 
 | [014](014-docker-compose-restructure.md) | Spec | Complete | Docker Compose Restructure & Platform Containerization |
 | [015](015-embedded-migrations.md) | Spec | Complete | Embedded Migrations (Service-Owned, Auto-Applied on Startup) |
 | [016](016-port-collision-shutdown.md) | Task | Complete | Bug: Port Collision Does Not Trigger Process Shutdown |
-| [017](017-service-health-checks.md) | Task | In Progress | Service Health Check Endpoints |
+| [017](017-reorganize-design-spec.md) | Task | Complete | Reorganize design-spec.md into Index + Section Files |
