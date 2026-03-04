@@ -10,4 +10,5 @@ This directory (`backlog/`) contains potential future tasks that are not yet com
 - [ ] [003_service-health-checks.md](backlog/003_service-health-checks.md) - Service Health Check Endpoints
 - [ ] [004_validate-traefik-e2e.md](backlog/004_validate-traefik-e2e.md) - Validate Traefik Routing via E2E Tests (blocked by 003)
 - [ ] [005_verify-environment-script.md](backlog/005_verify-environment-script.md) - Verify Environment Script
+- [ ] [006_runtime-isolation-for-parallel-branches.md](backlog/006_runtime-isolation-for-parallel-branches.md) - Runtime Isolation for Parallel Feature Branches
 
